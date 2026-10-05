@@ -254,8 +254,13 @@ function SummaryReset({ atMs, now }: { atMs: number | null; now: number }) {
 }
 
 /** `in 1 day · 09/12, 23:00`, optionally led by a label such as `Reset 1`. */
-function ResetLine(props: { display: ResetDisplay | null; lead?: string; className?: string }) {
-  const { display, lead, className } = props;
+function ResetLine(props: {
+  display: ResetDisplay | null;
+  lead?: string;
+  className?: string;
+  title?: string;
+}) {
+  const { display, lead, className, title } = props;
   const { t } = useTranslation();
   const parts: ReactNode[] = [];
   if (lead) parts.push(<span key="lead">{lead}</span>);
@@ -272,7 +277,7 @@ function ResetLine(props: { display: ResetDisplay | null; lead?: string; classNa
     parts.push(<span key="absolute">{display.absolute}</span>);
   }
   return (
-    <div className={`${styles.reset} ${className ?? ''}`}>
+    <div className={`${styles.reset} ${className ?? ''}`} title={title}>
       {parts.flatMap((part, index) => (index === 0 ? [part] : [' · ', part]))}
     </div>
   );
@@ -322,14 +327,16 @@ function LedgerRow(props: LedgerRowProps) {
   const meters = new Map(ledgerMeters(entry.type, quota, t).map((meter) => [meter.id, meter]));
   const secondaryIds = new Set(summary.slice(1).map((window) => window.id));
   const codexResets = entry.type === 'codex' ? codexManualResets(quota) : null;
+  // Show the resets once they are known, even at zero, so every account's reset
+  // state is visible; the action is then grayed out instead of hidden.
   const showClaudeResets =
     entry.type === 'claude' &&
-    ((claudeReset.count ?? 0) > 0 || claudeReset.buttonLabel === 'retry');
+    (claudeReset.count !== null ||
+      claudeReset.message !== '' ||
+      claudeReset.buttonLabel === 'retry');
   const showCodexReset =
-    status === 'success' &&
-    Boolean(adapter.resetQuota) &&
-    quota !== undefined &&
-    Boolean(adapter.canResetQuota?.(quota));
+    status === 'success' && Boolean(adapter.resetQuota) && codexResets !== null;
+  const canCodexReset = quota !== undefined && Boolean(adapter.canResetQuota?.(quota));
   const locale = i18n.resolvedLanguage;
 
   return (
@@ -381,44 +388,65 @@ function LedgerRow(props: LedgerRowProps) {
         {codexResets && (
           <ManualResets
             available={codexResets.available}
-            detail={
-              codexResets.next && (
-                <ResetLine
-                  lead={t('codex_quota.reset_credit_number', { index: codexResets.next.number })}
-                  display={buildResetDisplay(
-                    codexResets.next.expiresAtMs === null
-                      ? codexResets.next.expiresLabel
-                      : formatInstantShort(codexResets.next.expiresAtMs),
-                    codexResets.next.expiresAtMs,
-                    now,
-                    locale
-                  )}
-                />
-              )
-            }
+            detail={codexResets.credits.map((credit) => (
+              <ResetLine
+                key={credit.number}
+                className={styles.resetItem}
+                lead={resetLead(
+                  t('codex_quota.reset_credit_number', { index: credit.number }),
+                  credit.status === 'available' ? undefined : credit.status
+                )}
+                display={buildResetDisplay(
+                  credit.expiresAtMs === null
+                    ? credit.expiresLabel || t('quota_management.ledger_no_expiry')
+                    : formatInstantShort(credit.expiresAtMs),
+                  credit.expiresAtMs,
+                  now,
+                  locale
+                )}
+              />
+            ))}
           />
         )}
         {showClaudeResets && (
           <ManualResets
             available={claudeReset.count}
             detail={
-              claudeReset.message ? (
-                <div className={styles.manualMessage} role="status">
-                  {t(`claude_reset.${claudeReset.message}`)}
-                </div>
-              ) : (
-                claudeReset.expiresAtMs !== null && (
-                  <ResetLine
-                    lead={t('quota_management.windows_credit_expires')}
-                    display={buildResetDisplay(
-                      formatInstantShort(claudeReset.expiresAtMs),
-                      claudeReset.expiresAtMs,
-                      now,
-                      locale
-                    )}
-                  />
-                )
-              )
+              <>
+                {claudeReset.message && (
+                  <div className={styles.manualMessage} role="status">
+                    {t(`claude_reset.${claudeReset.message}`)}
+                  </div>
+                )}
+                {claudeReset.grants.map((grant, index) => {
+                  const endsAtMs = grant.endsAt === null ? null : Date.parse(grant.endsAt);
+                  return (
+                    <ResetLine
+                      key={grant.id}
+                      className={styles.resetItem}
+                      title={grant.label || undefined}
+                      lead={resetLead(
+                        `${t('codex_quota.reset_credit_number', { index: index + 1 })} (${grant.resetsLeft}/${grant.resetsTotal})`,
+                        grant.resetsLeft === 0
+                          ? t('claude_reset.state_used')
+                          : grant.paused
+                            ? t('claude_reset.state_paused')
+                            : grant.usableNow
+                              ? undefined
+                              : t('claude_reset.state_not_usable')
+                      )}
+                      display={buildResetDisplay(
+                        endsAtMs === null
+                          ? t('quota_management.ledger_no_expiry')
+                          : formatInstantShort(endsAtMs),
+                        endsAtMs,
+                        now,
+                        locale
+                      )}
+                    />
+                  );
+                })}
+              </>
             }
           />
         )}
@@ -428,14 +456,20 @@ function LedgerRow(props: LedgerRowProps) {
         {showCodexReset && (
           <ActionButton
             label={t('codex_quota.reset_button')}
+            title={canCodexReset ? undefined : t('quota_management.ledger_no_resets_left')}
             busy={resetting}
-            disabled={!canRefresh || loading || resetting}
+            disabled={!canCodexReset || !canRefresh || loading || resetting}
             onClick={onReset}
           />
         )}
         {showClaudeResets && (
           <ActionButton
             label={t(`claude_reset.${claudeReset.buttonLabel}`)}
+            title={
+              (claudeReset.count ?? 0) === 0 && claudeReset.buttonLabel !== 'retry'
+                ? t('quota_management.ledger_no_resets_left')
+                : undefined
+            }
             busy={claudeReset.busy}
             disabled={claudeReset.blocked}
             onClick={claudeReset.confirm}
@@ -529,6 +563,11 @@ function Meter(props: { meter: LedgerMeter; secondary: boolean; reset: ResetDisp
       <ResetLine display={reset} />
     </div>
   );
+}
+
+/** `Reset 1`, plus why it can't be spent (`used`, `paused`) when that applies. */
+function resetLead(label: string, note?: string): string {
+  return note ? `${label} (${note})` : label;
 }
 
 function ManualResets({ available, detail }: { available: number | null; detail: ReactNode }) {

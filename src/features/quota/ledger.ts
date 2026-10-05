@@ -331,6 +331,8 @@ export interface LedgerManualResets {
   available: number;
   /** The available credit that expires first, numbered as the card lists it. */
   next: { number: number; expiresAtMs: number | null; expiresLabel: string } | null;
+  /** Every credit in the card's order, so each one's expiry can be managed. */
+  credits: { number: number; status: string; expiresAtMs: number | null; expiresLabel: string }[];
 }
 
 export function codexManualResets(quota: QuotaCardState | undefined): LedgerManualResets | null {
@@ -340,15 +342,22 @@ export function codexManualResets(quota: QuotaCardState | undefined): LedgerManu
   if (available === null) return null;
 
   let next: LedgerManualResets['next'] = null;
+  const credits: LedgerManualResets['credits'] = [];
   for (const [index, credit] of (codex.rateLimitResetCredits ?? []).entries()) {
-    if (credit.status !== 'available') continue;
     const expiresAtMs = parseIsoToMs(credit.expiresAt);
+    credits.push({
+      number: index + 1,
+      status: credit.status,
+      expiresAtMs,
+      expiresLabel: credit.expiresAt,
+    });
+    if (credit.status !== 'available') continue;
     const sooner =
       next === null ||
       (expiresAtMs !== null && (next.expiresAtMs === null || expiresAtMs < next.expiresAtMs));
     if (sooner) next = { number: index + 1, expiresAtMs, expiresLabel: credit.expiresAt };
   }
-  return { available, next };
+  return { available, next, credits };
 }
 
 /**

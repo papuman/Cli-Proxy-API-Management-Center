@@ -355,6 +355,26 @@ describe('provider conversions', () => {
         expiresAtMs: Date.parse('2026-10-03T21:10:00Z'),
         expiresLabel: '2026-10-03T21:10:00Z',
       },
+      credits: [
+        {
+          number: 1,
+          status: 'available',
+          expiresAtMs: Date.parse('2026-10-20T10:00:00Z'),
+          expiresLabel: '2026-10-20T10:00:00Z',
+        },
+        {
+          number: 2,
+          status: 'used',
+          expiresAtMs: Date.parse('2026-09-12T10:00:00Z'),
+          expiresLabel: '2026-09-12T10:00:00Z',
+        },
+        {
+          number: 3,
+          status: 'available',
+          expiresAtMs: Date.parse('2026-10-03T21:10:00Z'),
+          expiresLabel: '2026-10-03T21:10:00Z',
+        },
+      ],
     });
   });
 });

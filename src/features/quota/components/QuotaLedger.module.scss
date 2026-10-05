@@ -206,6 +206,11 @@
   color: var(--text-quaternary);
 }
 
+.resetItem {
+  // One line per reset; wrap rather than cut off the expiry date.
+  white-space: normal;
+}
+
 .resetRelative {
   font-weight: 500;
   color: var(--text-tertiary);

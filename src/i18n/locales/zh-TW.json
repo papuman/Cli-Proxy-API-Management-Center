@@ -1610,6 +1610,8 @@
     "weekday_fri": "五",
     "weekday_sat": "六",
     "ledger_no_reset": "暫無待重設",
+    "ledger_no_expiry": "無到期時間",
+    "ledger_no_resets_left": "此帳戶沒有剩餘重置次數",
     "ledger_unavailable": "目前無法路由",
     "ledger_show_emails": "顯示信箱",
     "ledger_hide_emails": "隱藏信箱",
@@ -2262,6 +2264,9 @@
     "ineligible": "此帳戶不符合資格。",
     "unavailable": "重置暫不可用。",
     "rate_limited": "請求過於頻繁。",
-    "auth_error": "授權遭拒。"
+    "auth_error": "授權遭拒。",
+    "state_used": "已用",
+    "state_paused": "已暫停",
+    "state_not_usable": "暫不可用"
   }
 }

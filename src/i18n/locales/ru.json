@@ -1589,6 +1589,8 @@
     "weekday_fri": "Пт",
     "weekday_sat": "Сб",
     "ledger_no_reset": "Сброс не ожидается",
+    "ledger_no_expiry": "Без срока",
+    "ledger_no_resets_left": "На этом аккаунте не осталось сбросов",
     "ledger_unavailable": "Недоступен для маршрутизации",
     "ledger_show_emails": "Показать почту",
     "ledger_hide_emails": "Скрыть почту",
@@ -2232,6 +2234,9 @@
     "ineligible": "Эта учётная запись не соответствует условиям.",
     "unavailable": "Сбросы временно недоступны.",
     "rate_limited": "Слишком много запросов.",
-    "auth_error": "Авторизация отклонена."
+    "auth_error": "Авторизация отклонена.",
+    "state_used": "использован",
+    "state_paused": "приостановлен",
+    "state_not_usable": "пока недоступен"
   }
 }

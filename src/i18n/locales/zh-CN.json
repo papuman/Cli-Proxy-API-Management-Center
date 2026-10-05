@@ -1584,6 +1584,8 @@
     "weekday_fri": "五",
     "weekday_sat": "六",
     "ledger_no_reset": "暂无待重置",
+    "ledger_no_expiry": "无到期时间",
+    "ledger_no_resets_left": "此账户没有剩余重置次数",
     "ledger_unavailable": "当前无法路由",
     "ledger_show_emails": "显示邮箱",
     "ledger_hide_emails": "隐藏邮箱",
@@ -2236,6 +2238,9 @@
     "ineligible": "此账户不符合资格。",
     "unavailable": "重置暂不可用。",
     "rate_limited": "请求过于频繁。",
-    "auth_error": "授权被拒绝。"
+    "auth_error": "授权被拒绝。",
+    "state_used": "已用",
+    "state_paused": "已暂停",
+    "state_not_usable": "暂不可用"
   }
 }

@@ -54,7 +54,12 @@ import type { QuotaProviderType } from './providers/types';
 import { useDevinQuotaAutoLoad } from './providers/devin/useDevinQuotaAutoLoad';
 import { useQuotaActions } from './hooks/useQuotaActions';
 import { useQuotaBatchLoader } from './hooks/useQuotaBatchLoader';
-import { readQuotaUiState, writeQuotaUiState } from './uiState';
+import {
+  readQuotaUiState,
+  writeQuotaUiState,
+  readSavedQuotaLayout,
+  saveQuotaLayout,
+} from './uiState';
 import styles from './QuotaPage.module.scss';
 
 const TAB_IDS: string[] = ['all', ...QUOTA_TAB_ORDER];
@@ -80,7 +85,9 @@ export function QuotaPage() {
   );
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
-  const [layout, setLayout] = useState<QuotaLayout>(() => readQuotaUiState()?.layout ?? 'ledger');
+  const [layout, setLayout] = useState<QuotaLayout>(
+    () => readQuotaUiState()?.layout ?? readSavedQuotaLayout() ?? 'ledger'
+  );
   // Never persisted, so emails are masked again whenever the page is reopened.
   const [showEmails, setShowEmails] = useState(false);
   // 页头 + tabs 的入场级联（标题 → meta → 动作 → tabs，级差 70ms）
@@ -212,6 +219,7 @@ export function QuotaPage() {
   const handleLayoutChange = useCallback((next: string) => {
     setLayout(next as QuotaLayout);
     writeQuotaUiState({ layout: next as QuotaLayout });
+    saveQuotaLayout(next as QuotaLayout);
   }, []);
 
   const sortOptions = useMemo(
@@ -392,15 +400,23 @@ export function QuotaPage() {
             onChange={handleTabChange}
           />
           <div className={styles.viewControls}>
-            <Select
-              value={layout}
-              options={layoutOptions}
-              onChange={handleLayoutChange}
-              ariaLabel={t('quota_management.ledger_layout')}
-              size="sm"
-              fullWidth={false}
-              className={styles.layoutSelect}
-            />
+            <div
+              className={styles.layoutSwitch}
+              role="group"
+              aria-label={t('quota_management.ledger_layout')}
+            >
+              {layoutOptions.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={styles.layoutOption}
+                  aria-pressed={layout === option.value}
+                  onClick={() => handleLayoutChange(option.value)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
             <Select
               value={sortMode}
               options={sortOptions}

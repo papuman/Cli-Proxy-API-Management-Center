@@ -45,8 +45,39 @@
   width: 148px;
 }
 
-.layoutSelect {
-  width: 116px;
+.layoutSwitch {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+}
+
+.layoutOption {
+  @include button-reset;
+  padding: 3px 10px;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--text-tertiary);
+  cursor: pointer;
+
+  &:hover {
+    color: var(--text-primary);
+  }
+
+  &[aria-pressed='true'] {
+    color: var(--text-primary);
+    font-weight: 600;
+    background: var(--bg-primary);
+    box-shadow: 0 1px 2px color-mix(in srgb, var(--text-primary) 12%, transparent);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 1px;
+  }
 }
 
 @include mobile {

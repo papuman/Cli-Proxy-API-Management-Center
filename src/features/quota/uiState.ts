@@ -62,3 +62,25 @@ export const writeQuotaUiState = (state: QuotaUiState) => {
     // ignore
   }
 };
+
+/** The chosen layout also survives new sessions, unlike the rest of the page state. */
+const QUOTA_LAYOUT_KEY = 'quotaPage.layout';
+
+export const readSavedQuotaLayout = (): QuotaLayout | undefined => {
+  if (typeof window === 'undefined') return undefined;
+  try {
+    const value = window.localStorage.getItem(QUOTA_LAYOUT_KEY);
+    return isQuotaLayout(value) ? value : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+export const saveQuotaLayout = (layout: QuotaLayout) => {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(QUOTA_LAYOUT_KEY, layout);
+  } catch {
+    // ignore
+  }
+};

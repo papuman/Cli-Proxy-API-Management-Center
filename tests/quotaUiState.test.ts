@@ -7,7 +7,12 @@
  */
 
 import { afterAll, beforeEach, describe, expect, test } from 'bun:test';
-import { readQuotaUiState, writeQuotaUiState } from '@/features/quota/uiState';
+import {
+  readQuotaUiState,
+  readSavedQuotaLayout,
+  saveQuotaLayout,
+  writeQuotaUiState,
+} from '@/features/quota/uiState';
 
 const KEY = 'quotaPage.uiState';
 
@@ -84,5 +89,21 @@ describe('quota ui state', () => {
 
     storage.setItem(KEY, '"a string"');
     expect(readQuotaUiState()).toBeNull();
+  });
+});
+
+describe('saved layout', () => {
+  test('survives a new session and ignores unknown values', () => {
+    const local = new Map<string, string>();
+    (globalThis as unknown as { window: Record<string, unknown> }).window.localStorage = {
+      getItem: (key: string) => local.get(key) ?? null,
+      setItem: (key: string, value: string) => void local.set(key, value),
+    };
+    expect(readSavedQuotaLayout()).toBeUndefined();
+    saveQuotaLayout('compact');
+    storage.clear();
+    expect(readSavedQuotaLayout()).toBe('compact');
+    local.set('quotaPage.layout', 'bogus');
+    expect(readSavedQuotaLayout()).toBeUndefined();
   });
 });

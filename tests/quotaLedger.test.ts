@@ -9,6 +9,7 @@ import type {
 } from '../src/types';
 import {
   codexManualResets,
+  formatCompactDuration,
   headlineRemaining,
   ledgerMeters,
   maskCredentialName,
@@ -402,5 +403,23 @@ describe('maskCredentialName', () => {
 
   test('leaves names without an email unchanged', () => {
     expect(maskCredentialName('kimi-main.json', 'kimi')).toBe('kimi-main.json');
+  });
+});
+
+describe('formatCompactDuration', () => {
+  const now = Date.parse('2026-10-05T12:00:00Z');
+  test.each([
+    [42 * 60_000, '42m'],
+    [3 * 3_600_000 + 57 * 60_000, '3h57m'],
+    [7 * 3_600_000, '7h'],
+    [2 * 86_400_000 + 5 * 3_600_000, '2d5h'],
+    [16 * 86_400_000, '16d'],
+  ])('%p ms left reads %s', (delta, label) => {
+    expect(formatCompactDuration(now + delta, now)).toBe(label);
+  });
+
+  test('is null for unknown or past instants', () => {
+    expect(formatCompactDuration(null, now)).toBe(null);
+    expect(formatCompactDuration(now - 1, now)).toBe(null);
   });
 });

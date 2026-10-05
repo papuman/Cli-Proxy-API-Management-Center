@@ -1598,6 +1598,8 @@
     "ledger_layout": "Вид",
     "ledger_view": "Список",
     "ledger_cards": "Карточки",
+    "compact_view": "Компактно",
+    "compact_reset": "Сбросить",
     "ledger_of_capacity": "из {{capacity}}%",
     "ledger_show": "Показать",
     "ledger_hide": "Скрыть",

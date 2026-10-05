@@ -378,3 +378,18 @@ export function maskCredentialName(name: string, type: QuotaProviderType): strin
     return `${prefix}${mailbox.slice(0, 1)}•••@${host.slice(0, 1)}•••${topLevel}${suffix}`;
   });
 }
+
+/**
+ * Time left until `atMs`, as short as a dense table needs: `42m`, `3h57m`, `7h`,
+ * `2d5h`, `16d`. Null for an unknown or past instant.
+ */
+export function formatCompactDuration(atMs: number | null, nowMs: number): string | null {
+  if (atMs === null || !Number.isFinite(atMs) || atMs <= nowMs) return null;
+  const minutes = Math.max(1, Math.round((atMs - nowMs) / 60_000));
+  const days = Math.floor(minutes / 1440);
+  const hours = Math.floor((minutes % 1440) / 60);
+  const mins = minutes % 60;
+  if (days > 0) return hours > 0 ? `${days}d${hours}h` : `${days}d`;
+  if (hours > 0) return mins > 0 ? `${hours}h${mins}m` : `${hours}h`;
+  return `${mins}m`;
+}

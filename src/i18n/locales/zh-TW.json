@@ -1619,6 +1619,8 @@
     "ledger_layout": "版面",
     "ledger_view": "列表",
     "ledger_cards": "卡片",
+    "compact_view": "緊湊",
+    "compact_reset": "重置",
     "ledger_of_capacity": "共 {{capacity}}%",
     "ledger_show": "展開",
     "ledger_hide": "收合",

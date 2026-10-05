@@ -1596,6 +1596,8 @@
     "ledger_layout": "Layout",
     "ledger_view": "Ledger",
     "ledger_cards": "Cards",
+    "compact_view": "Compact",
+    "compact_reset": "Reset",
     "ledger_of_capacity": "of {{capacity}}%",
     "ledger_show": "Show",
     "ledger_hide": "Hide",

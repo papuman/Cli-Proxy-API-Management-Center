@@ -1593,6 +1593,8 @@
     "ledger_layout": "布局",
     "ledger_view": "列表",
     "ledger_cards": "卡片",
+    "compact_view": "紧凑",
+    "compact_reset": "重置",
     "ledger_of_capacity": "共 {{capacity}}%",
     "ledger_show": "展开",
     "ledger_hide": "收起",

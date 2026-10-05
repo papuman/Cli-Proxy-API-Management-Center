@@ -25,6 +25,7 @@ import { ProviderTabs } from '@/features/authFiles/components/ProviderTabs';
 import { QuotaHeader, QuotaHeaderSearch, QuotaHeaderToggle } from './components/QuotaHeader';
 import { QuotaCard } from './components/QuotaCard';
 import { QuotaLedger } from './components/QuotaLedger';
+import { QuotaCompact } from './components/QuotaCompact';
 import { QuotaTimeline } from './components/QuotaTimeline';
 import {
   CARD_ENTRANCE_BUDGET_MS,
@@ -222,6 +223,7 @@ export function QuotaPage() {
   const layoutOptions = useMemo(
     () => [
       { value: 'ledger', label: t('quota_management.ledger_view') },
+      { value: 'compact', label: t('quota_management.compact_view') },
       { value: 'cards', label: t('quota_management.ledger_cards') },
     ],
     [t]
@@ -367,7 +369,7 @@ export function QuotaPage() {
         actions={
           <>
             <QuotaHeaderSearch value={search} onChange={handleSearchChange} />
-            {layout === 'ledger' && (
+            {layout !== 'cards' && (
               <QuotaHeaderToggle pressed={showEmails} onToggle={() => setShowEmails(!showEmails)}>
                 {t(
                   showEmails
@@ -419,11 +421,13 @@ export function QuotaPage() {
 
         {loading ? (
           <div
-            className={layout === 'ledger' ? styles.ledgerSkeleton : styles.grid}
+            className={layout === 'cards' ? styles.grid : styles.ledgerSkeleton}
             aria-hidden="true"
           >
             {Array.from({ length: SKELETON_CARD_COUNT }, (_, index) =>
-              layout === 'ledger' ? (
+              layout === 'compact' ? (
+                <Skeleton key={index} height={30} rounded={6} />
+              ) : layout === 'ledger' ? (
                 <Skeleton key={index} height={56} rounded={10} />
               ) : (
                 <Skeleton key={index} height={168} rounded={14} />
@@ -457,6 +461,16 @@ export function QuotaPage() {
                 </Button>
               )
             }
+          />
+        ) : layout === 'compact' ? (
+          <QuotaCompact
+            entries={pageItems}
+            quotaFor={getQuota}
+            showEmails={showEmails}
+            canRefresh={canUseActions}
+            resettingName={resettingQuotaName}
+            onRefresh={(entry) => void refreshQuota(entry.file, QUOTA_ADAPTERS[entry.type])}
+            onReset={(entry) => resetQuota(entry.file, QUOTA_ADAPTERS[entry.type])}
           />
         ) : layout === 'ledger' ? (
           <QuotaLedger

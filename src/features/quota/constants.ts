@@ -25,7 +25,7 @@ export const QUOTA_SORT_MODES = ['remaining', 'soonest', 'default'] as const;
 export type QuotaSortMode = (typeof QUOTA_SORT_MODES)[number];
 
 /** Ledger rows (the initial layout) or the upstream card grid with its timeline. */
-export const QUOTA_LAYOUTS = ['ledger', 'cards'] as const;
+export const QUOTA_LAYOUTS = ['ledger', 'compact', 'cards'] as const;
 
 export type QuotaLayout = (typeof QUOTA_LAYOUTS)[number];
 

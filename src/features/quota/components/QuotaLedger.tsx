@@ -254,13 +254,8 @@ function SummaryReset({ atMs, now }: { atMs: number | null; now: number }) {
 }
 
 /** `in 1 day · 09/12, 23:00`, optionally led by a label such as `Reset 1`. */
-function ResetLine(props: {
-  display: ResetDisplay | null;
-  lead?: string;
-  className?: string;
-  title?: string;
-}) {
-  const { display, lead, className, title } = props;
+function ResetLine(props: { display: ResetDisplay | null; lead?: string; className?: string }) {
+  const { display, lead, className } = props;
   const { t } = useTranslation();
   const parts: ReactNode[] = [];
   if (lead) parts.push(<span key="lead">{lead}</span>);
@@ -277,7 +272,7 @@ function ResetLine(props: {
     parts.push(<span key="absolute">{display.absolute}</span>);
   }
   return (
-    <div className={`${styles.reset} ${className ?? ''}`} title={title}>
+    <div className={`${styles.reset} ${className ?? ''}`}>
       {parts.flatMap((part, index) => (index === 0 ? [part] : [' · ', part]))}
     </div>
   );
@@ -388,66 +383,43 @@ function LedgerRow(props: LedgerRowProps) {
         {codexResets && (
           <ManualResets
             available={codexResets.available}
-            detail={codexResets.credits.map((credit) => (
-              <ResetLine
-                key={credit.number}
-                className={styles.resetItem}
-                lead={resetLead(
-                  t('codex_quota.reset_credit_number', { index: credit.number }),
-                  credit.status === 'available' ? undefined : credit.status
-                )}
-                display={buildResetDisplay(
-                  credit.expiresAtMs === null
-                    ? credit.expiresLabel || t('quota_management.ledger_no_expiry')
-                    : formatInstantShort(credit.expiresAtMs),
-                  credit.expiresAtMs,
-                  now,
-                  locale
-                )}
-              />
-            ))}
+            total={codexResets.credits.length || codexResets.available}
+            items={codexResets.credits.map((credit) => ({
+              key: String(credit.number),
+              label: t('codex_quota.reset_credit_number', { index: credit.number }),
+              atMs: credit.expiresAtMs,
+              atLabel: credit.expiresLabel,
+              note: credit.status === 'available' ? undefined : credit.status,
+            }))}
+            now={now}
+            locale={locale}
           />
         )}
         {showClaudeResets && (
           <ManualResets
             available={claudeReset.count}
-            detail={
-              <>
-                {claudeReset.message && (
-                  <div className={styles.manualMessage} role="status">
-                    {t(`claude_reset.${claudeReset.message}`)}
-                  </div>
-                )}
-                {claudeReset.grants.map((grant, index) => {
-                  const endsAtMs = grant.endsAt === null ? null : Date.parse(grant.endsAt);
-                  return (
-                    <ResetLine
-                      key={grant.id}
-                      className={styles.resetItem}
-                      title={grant.label || undefined}
-                      lead={resetLead(
-                        `${t('codex_quota.reset_credit_number', { index: index + 1 })} (${grant.resetsLeft}/${grant.resetsTotal})`,
-                        grant.resetsLeft === 0
-                          ? t('claude_reset.state_used')
-                          : grant.paused
-                            ? t('claude_reset.state_paused')
-                            : grant.usableNow
-                              ? undefined
-                              : t('claude_reset.state_not_usable')
-                      )}
-                      display={buildResetDisplay(
-                        endsAtMs === null
-                          ? t('quota_management.ledger_no_expiry')
-                          : formatInstantShort(endsAtMs),
-                        endsAtMs,
-                        now,
-                        locale
-                      )}
-                    />
-                  );
-                })}
-              </>
+            total={
+              claudeReset.count === null
+                ? null
+                : claudeReset.grants.reduce((sum, grant) => sum + grant.resetsTotal, 0)
             }
+            items={claudeReset.grants.map((grant, index) => ({
+              key: grant.id,
+              label: `${t('codex_quota.reset_credit_number', { index: index + 1 })}${grant.label ? ` · ${grant.label}` : ''} (${grant.resetsLeft}/${grant.resetsTotal})`,
+              atMs: grant.endsAt === null ? null : Date.parse(grant.endsAt),
+              atLabel: null,
+              note:
+                grant.resetsLeft === 0
+                  ? t('claude_reset.state_used')
+                  : grant.paused
+                    ? t('claude_reset.state_paused')
+                    : grant.usableNow
+                      ? undefined
+                      : t('claude_reset.state_not_usable'),
+            }))}
+            message={claudeReset.message && t(`claude_reset.${claudeReset.message}`)}
+            now={now}
+            locale={locale}
           />
         )}
       </div>
@@ -565,23 +537,93 @@ function Meter(props: { meter: LedgerMeter; secondary: boolean; reset: ResetDisp
   );
 }
 
-/** `Reset 1`, plus why it can't be spent (`used`, `paused`) when that applies. */
-function resetLead(label: string, note?: string): string {
-  return note ? `${label} (${note})` : label;
-}
+type ManualResetItem = {
+  key: string;
+  /** `Reset 1`, with the grant name and count where the provider has them. */
+  label: string;
+  atMs: number | null;
+  atLabel: string | null;
+  /** Why it can't be spent (`used`, `paused`); absent when it can. */
+  note?: string;
+};
 
-function ManualResets({ available, detail }: { available: number | null; detail: ReactNode }) {
+/**
+ * Laid out like a quota meter: count on the right, a bar for what is left, then
+ * when the next spendable reset expires. Every reset, spendable or not, is
+ * listed in the tooltip; a second spendable reset gets its own line.
+ */
+function ManualResets(props: {
+  available: number | null;
+  total: number | null;
+  items: ManualResetItem[];
+  message?: string;
+  now: number;
+  locale?: string;
+}) {
+  const { available, total, items, message, now, locale } = props;
   const { t } = useTranslation();
+  const label = t('codex_quota.reset_credits_label');
+  const remaining = available === null || !total ? null : Math.round((available / total) * 100);
+  const expiry = (item: ManualResetItem) =>
+    buildResetDisplay(
+      item.atMs === null
+        ? item.atLabel || t('quota_management.ledger_no_expiry')
+        : formatInstantShort(item.atMs),
+      item.atMs,
+      now,
+      locale
+    );
+  const spendable = items
+    .filter((item) => !item.note)
+    .sort((a, b) => (a.atMs ?? Infinity) - (b.atMs ?? Infinity));
+  const tooltip = items
+    .map((item) => {
+      const display = expiry(item);
+      const when = display ? [display.relative, display.absolute].filter(Boolean).join(' · ') : '';
+      return `${item.label}${item.note ? ` [${item.note}]` : ''} — ${t('quota_management.windows_credit_expires')} ${when}`;
+    })
+    .join('\n');
   return (
-    <div className={styles.meter}>
+    <div className={styles.meter} title={tooltip || undefined}>
       <div className={styles.meterHead}>
-        <span className={styles.meterLabel}>{t('codex_quota.reset_credits_label')}</span>
+        <span className={styles.meterLabel}>{label}</span>
+        <span className={styles.meterPercent}>
+          {available === null ? '--' : total ? `${available} / ${total}` : available}
+        </span>
       </div>
-      <div className={styles.available}>
-        <span className={styles.availableCount}>{available ?? '--'}</span>
-        <span>{t('quota_management.ledger_available')}</span>
+      <div
+        className={styles.bar}
+        role="meter"
+        aria-label={label}
+        aria-valuemin={0}
+        aria-valuemax={total ?? 0}
+        aria-valuenow={available ?? undefined}
+      >
+        <span
+          className={`${styles.fill} ${toneClass(remaining)}`}
+          style={{ width: `${remaining ?? 0}%` }}
+        />
       </div>
-      {detail}
+      {message && (
+        <div className={styles.manualMessage} role="status">
+          {message}
+        </div>
+      )}
+      {spendable.length === 0 ? (
+        <div className={styles.reset}>{t('quota_management.ledger_none_left')}</div>
+      ) : (
+        spendable.map((item, index) => (
+          <ResetLine
+            key={item.key}
+            lead={
+              spendable.length > 1
+                ? t('codex_quota.reset_credit_number', { index: index + 1 })
+                : undefined
+            }
+            display={expiry(item)}
+          />
+        ))
+      )}
     </div>
   );
 }

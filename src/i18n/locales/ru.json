@@ -1590,6 +1590,7 @@
     "weekday_sat": "Сб",
     "ledger_no_reset": "Сброс не ожидается",
     "ledger_no_expiry": "Без срока",
+    "ledger_none_left": "Не осталось",
     "ledger_no_resets_left": "На этом аккаунте не осталось сбросов",
     "ledger_unavailable": "Недоступен для маршрутизации",
     "ledger_show_emails": "Показать почту",

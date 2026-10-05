@@ -1588,6 +1588,7 @@
     "weekday_sat": "Sat",
     "ledger_no_reset": "No reset pending",
     "ledger_no_expiry": "No expiry",
+    "ledger_none_left": "None left",
     "ledger_no_resets_left": "No resets left on this account",
     "ledger_unavailable": "Unavailable for routing",
     "ledger_show_emails": "Show emails",

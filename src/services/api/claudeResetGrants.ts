@@ -181,6 +181,20 @@ function parseGrant(value: unknown): AnthropicResetGrant | null {
 }
 
 /**
+ * When the soonest-expiring grant that still has resets left runs out, in ms.
+ * Grants without `ends_at`, already used up, or already ended are ignored.
+ */
+export function nextGrantExpiryMs(grants: AnthropicResetGrant[], now: number): number | null {
+  let soonest: number | null = null;
+  for (const grant of grants) {
+    if (grant.resetsLeft === 0 || grant.endsAt === null) continue;
+    const endsAtMs = Date.parse(grant.endsAt);
+    if (endsAtMs > now && (soonest === null || endsAtMs < soonest)) soonest = endsAtMs;
+  }
+  return soonest;
+}
+
+/**
  * Parses the `cedar_ember` block. Returns null for a missing or malformed block;
  * one malformed grant, a duplicate id, or a bad timestamp rejects the whole block.
  */

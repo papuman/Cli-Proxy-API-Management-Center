@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/useAuthStore';
 import { useNotificationStore } from '@/stores';
 import { apiClient } from '@/services/api/client';
 import {
+  nextGrantExpiryMs,
   readClaudeResetGrants,
   type AnthropicResetGrantStatus,
 } from '@/services/api/claudeResetGrants';
@@ -112,6 +113,7 @@ export function useClaudeResetGrants(
   };
   return {
     count: status?.grants.reduce((sum, grant) => sum + grant.resetsLeft, 0) ?? null,
+    expiresAtMs: status ? nextGrantExpiryMs(status.grants, now) : null,
     busy,
     blocked,
     confirm,

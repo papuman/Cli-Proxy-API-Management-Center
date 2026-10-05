@@ -402,10 +402,22 @@ function LedgerRow(props: LedgerRowProps) {
           <ManualResets
             available={claudeReset.count}
             detail={
-              claudeReset.message && (
+              claudeReset.message ? (
                 <div className={styles.manualMessage} role="status">
                   {t(`claude_reset.${claudeReset.message}`)}
                 </div>
+              ) : (
+                claudeReset.expiresAtMs !== null && (
+                  <ResetLine
+                    lead={t('quota_management.windows_credit_expires')}
+                    display={buildResetDisplay(
+                      formatInstantShort(claudeReset.expiresAtMs),
+                      claudeReset.expiresAtMs,
+                      now,
+                      locale
+                    )}
+                  />
+                )
               )
             }
           />

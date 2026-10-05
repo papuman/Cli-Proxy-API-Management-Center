@@ -4,6 +4,7 @@ import { afterEach, describe, expect, test } from 'bun:test';
 import {
   anthropicResetGrantBlocker,
   claimClaudeResetGrant,
+  nextGrantExpiryMs,
   parseAnthropicResetGrantStatus,
   readClaudeOrganization,
   readClaudeResetGrants,
@@ -351,4 +352,29 @@ test('Claude card uses Codex count and action styles and shared confirmation, no
   expect(hook).toContain("pending ? 'claude_reset.retry_confirm'");
   expect(hook).not.toContain('<Modal');
   expect(hook).not.toContain('status.grants.map');
+});
+
+describe('nextGrantExpiryMs', () => {
+  const now = Date.parse('2026-10-05T12:00:00Z');
+  const grants = (items: Record<string, unknown>[]) =>
+    parseAnthropicResetGrantStatus({ eligible: true, grants: items })!.grants;
+
+  test('returns the soonest future expiry among grants with resets left', () => {
+    const result = nextGrantExpiryMs(
+      grants([
+        { id: 'late', resets_total: 1, resets_left: 1, ends_at: '2026-10-20T00:00:00Z' },
+        { id: 'soon', resets_total: 1, resets_left: 1, ends_at: '2026-10-08T00:00:00Z' },
+        { id: 'spent', resets_total: 1, resets_left: 0, ends_at: '2026-10-06T00:00:00Z' },
+        { id: 'past', resets_total: 1, resets_left: 1, ends_at: '2026-10-01T00:00:00Z' },
+      ]),
+      now
+    );
+    expect(result).toBe(Date.parse('2026-10-08T00:00:00Z'));
+  });
+
+  test('is null when no grant says when it ends', () => {
+    expect(nextGrantExpiryMs(grants([{ id: 'open', resets_total: 1, resets_left: 1 }]), now)).toBe(
+      null
+    );
+  });
 });

@@ -42,6 +42,21 @@ export function canRefreshQuotaAfterList(
   );
 }
 
+/**
+ * Credentials to fetch automatically when the page opens: enabled, not yet
+ * loaded, and not xAI (its paid-tier fallback probe is a billable request) or
+ * Devin (it has its own first-view loader).
+ */
+export function autoLoadTargets(
+  entries: QuotaFileEntry[],
+  hasQuota: (entry: QuotaFileEntry) => boolean
+): QuotaFileEntry[] {
+  return entries.filter(
+    (entry) =>
+      entry.type !== 'xai' && entry.type !== 'devin' && !entry.file.disabled && !hasQuota(entry)
+  );
+}
+
 export const resolveQuotaProviderType = (file: AuthFileItem): QuotaProviderType | null =>
   QUOTA_TAB_ORDER.find((type) => QUOTA_FILTER_MAP[type](file)) ?? null;
 

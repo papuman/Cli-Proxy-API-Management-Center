@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { QUOTA_PAGE_SIZE } from '@/features/quota/constants';
 import {
+  autoLoadTargets,
   buildTabCounts,
   canRefreshQuotaAfterList,
   classifyQuotaFiles,
@@ -287,5 +288,26 @@ describe('sortQuotaEntries', () => {
     const last = entries[entries.length - 1].file.name;
     const sorted = sortQuotaEntries(entries, 'soonest', resolver({ [last]: 1 }));
     expect(paginate(sorted, 1, 2).pageItems[0].file.name).toBe(last);
+  });
+});
+
+describe('auto-load on page open', () => {
+  const entries = classifyQuotaFiles([...FILES, file('devin-a.json', 'devin')]);
+
+  test('loads enabled credentials without quota, never xAI or Devin', () => {
+    const names = autoLoadTargets(entries, () => false).map((entry) => entry.file.name);
+    expect(names).toContain('claude-a.json');
+    expect(names).toContain('codex-b.json');
+    expect(names).not.toContain('grok-a.json');
+    expect(names).not.toContain('devin-a.json');
+    expect(names).not.toContain('claude-off.json');
+  });
+
+  test('skips credentials that already have quota', () => {
+    const names = autoLoadTargets(entries, (entry) => entry.file.name === 'claude-a.json').map(
+      (entry) => entry.file.name
+    );
+    expect(names).not.toContain('claude-a.json');
+    expect(names).toContain('kimi-a.json');
   });
 });

@@ -36,6 +36,7 @@ import {
   type QuotaTabId,
 } from './constants';
 import {
+  autoLoadTargets,
   buildTabCounts,
   canRefreshQuotaAfterList,
   classifyQuotaFiles,
@@ -298,6 +299,27 @@ export function QuotaPage() {
       void loadQuota(pageItems);
     }
   }, [disableControls, error, filesGeneration, loading, loadQuota, pageItems, sessionGeneration]);
+
+  // Auto-load once per visit and session: when the first file list settles,
+  // fetch the visible credentials that have no quota yet.
+  const autoLoadedSessionRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (loading || error || disableControls) return;
+    if (filesGeneration !== sessionGeneration) return;
+    if (autoLoadedSessionRef.current === sessionGeneration) return;
+    autoLoadedSessionRef.current = sessionGeneration;
+    const targets = autoLoadTargets(pageItems, (entry) => Boolean(getQuota(entry)));
+    if (targets.length > 0) void loadQuota(targets);
+  }, [
+    disableControls,
+    error,
+    filesGeneration,
+    getQuota,
+    loading,
+    loadQuota,
+    pageItems,
+    sessionGeneration,
+  ]);
 
   useDevinQuotaAutoLoad(
     pageItems,

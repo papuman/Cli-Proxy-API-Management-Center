@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/useAuthStore';
 import { useNotificationStore } from '@/stores';
 import { apiClient } from '@/services/api/client';
 import {
+  AnthropicResetGrantError,
   nextGrantExpiryMs,
   readClaudeResetGrants,
   type AnthropicResetGrantStatus,
@@ -13,6 +14,14 @@ import type { AuthFileItem } from '@/types';
 import { normalizeAuthIndex } from '@/utils/quota';
 import { resetGrantOperations, RETRY_WINDOW_MS } from './resetGrantOperations';
 import { selectResetGrant } from './selectResetGrant';
+
+/**
+ * Recent reads per account. Anthropic rate-limits the usage endpoint per
+ * account, so switching layouts or re-rendering must not re-read; a refresh
+ * after the TTL, or after a claim, reads again.
+ */
+const READ_TTL_MS = 2 * 60_000;
+const recentReads = new Map<string, { at: number; status: AnthropicResetGrantStatus }>();
 
 /** Card-owned reads; the session-scoped journal owns spending and ambiguous retries. */
 export function useClaudeResetGrants(
@@ -42,18 +51,31 @@ export function useClaudeResetGrants(
     const version = ++generation.current;
     setStatus(null);
     if (!enabled || disabled || !sessionActive || !authIndex) return;
+    const cacheKey = `${session}:${key}`;
+    const cached = recentReads.get(cacheKey);
+    if (cached && reload === 0 && Date.now() - cached.at < READ_TTL_MS) {
+      setStatus(cached.status);
+      setMessage('');
+      return;
+    }
     let cancelled = false;
     const current = () =>
       !cancelled && version === generation.current && session === apiClient.getConnectionRevision();
     void readClaudeResetGrants(authIndex).then(
       (result) => {
+        recentReads.set(cacheKey, { at: Date.now(), status: result });
         if (current()) {
           setStatus(result);
           setMessage('');
         }
       },
-      () => {
-        if (current()) setMessage('read_error');
+      (error: unknown) => {
+        if (!current()) return;
+        setMessage(
+          error instanceof AnthropicResetGrantError && error.code === 'rate_limited'
+            ? 'read_rate_limited'
+            : 'read_error'
+        );
       }
     );
     return () => {

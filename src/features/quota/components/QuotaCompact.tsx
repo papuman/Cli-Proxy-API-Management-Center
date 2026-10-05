@@ -123,7 +123,7 @@ function CompactRow(props: {
   const loading = status === 'loading';
   const claudeReset = useClaudeResetGrants(
     entry.file,
-    entry.type === 'claude' && status !== 'idle',
+    entry.type === 'claude' && status === 'success',
     !canRefresh || loading || resetting,
     quota,
     props.onRefresh

@@ -311,7 +311,7 @@ function LedgerRow(props: LedgerRowProps) {
   const loading = status === 'loading';
   const claudeReset = useClaudeResetGrants(
     file,
-    entry.type === 'claude' && status !== 'idle',
+    entry.type === 'claude' && status === 'success',
     !canRefresh || loading || resetting,
     quota,
     onRefresh

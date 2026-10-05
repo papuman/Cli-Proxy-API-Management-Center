@@ -2227,6 +2227,7 @@
     "scope": "Uses a limited reset grant to clear eligible Claude usage windows. Only confirm when you want to spend a reset. Recovery is limited to this tab/session; do not reload or use another tab while an outcome is unknown.",
     "loading": "Loading…",
     "read_error": "Reset grants could not be read. Nothing was submitted.",
+    "read_rate_limited": "Anthropic is rate-limiting reads for this account. Try again in a few minutes. Nothing was submitted.",
     "blocked": "Reset not submitted: eligibility, account identity, or session could not be verified. Refresh and check again.",
     "unknown": "The outcome is unknown. A reset may have been spent. Retry within 10 minutes using the same request ID; do not start another claim elsewhere.",
     "expired": "The retry window has expired. Further claims are blocked in this session. Check your Claude account before taking any further action.",

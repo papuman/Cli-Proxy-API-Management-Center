@@ -2,6 +2,7 @@ import { selectResetGrant } from '../src/features/quota/providers/claude/selectR
 
 import { afterEach, describe, expect, test } from 'bun:test';
 import {
+  AnthropicResetGrantError,
   anthropicResetGrantBlocker,
   claimClaudeResetGrant,
   nextGrantExpiryMs,
@@ -377,4 +378,11 @@ describe('nextGrantExpiryMs', () => {
       null
     );
   });
+});
+
+test('a 429 from Anthropic reads as rate limited, not a generic failure', async () => {
+  apiCallApi.request = async () => ({ statusCode: 429, body: {}, bodyText: '', header: {} });
+  const error = await readClaudeResetGrants('index').catch((caught: unknown) => caught);
+  expect(error).toBeInstanceOf(AnthropicResetGrantError);
+  expect((error as AnthropicResetGrantError).code).toBe('rate_limited');
 });

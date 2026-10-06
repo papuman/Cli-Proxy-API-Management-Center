@@ -1,0 +1,65 @@
+import { describe, expect, test } from 'bun:test';
+import type { AuthFileItem } from '../src/types';
+import type { QuotaFileEntry } from '../src/features/quota/logic';
+import {
+  PIN_PRIORITY,
+  buildRoutingState,
+  pinPatches,
+  unpinPatches,
+} from '../src/features/quota/routing';
+
+const idle = Array.from({ length: 20 }, () => ({ success: 0, failed: 0 }));
+const withRecent = (counts: number[]) => [
+  ...idle.slice(counts.length),
+  ...counts.map((n) => ({ success: n, failed: 0 })),
+];
+
+const entry = (type: string, file: Partial<AuthFileItem> & { name: string }): QuotaFileEntry =>
+  ({ type, file: { recentRequests: idle, ...file } }) as unknown as QuotaFileEntry;
+
+describe('buildRoutingState', () => {
+  test('marks accounts with requests in the last two buckets as in use', () => {
+    const state = buildRoutingState([
+      entry('claude', { name: 'a', recentRequests: withRecent([0, 5]) }),
+      entry('claude', { name: 'b', recentRequests: withRecent([3, 0]) }),
+      entry('claude', { name: 'c', recentRequests: withRecent([9, 0, 0]) }),
+      entry('claude', { name: 'd', recentRequests: withRecent([4]), disabled: true }),
+    ]);
+    expect([...state.inUse]).toEqual([
+      ['a', 5],
+      ['b', 3],
+    ]);
+  });
+
+  test('pins the single top-priority account per provider, never a tie', () => {
+    const state = buildRoutingState([
+      entry('claude', { name: 'a', priority: PIN_PRIORITY }),
+      entry('claude', { name: 'b' }),
+      entry('codex', { name: 'x', priority: 5 }),
+      entry('codex', { name: 'y', priority: 5 }),
+    ]);
+    expect(state.pinned.get('claude')).toBe('a');
+    expect(state.pinned.has('codex')).toBe(false);
+  });
+});
+
+describe('pin patches', () => {
+  const entries = [
+    entry('claude', { name: 'a', priority: PIN_PRIORITY }),
+    entry('claude', { name: 'b' }),
+    entry('claude', { name: 'c', priority: 3 }),
+    entry('codex', { name: 'x', priority: 7 }),
+  ];
+
+  test('moves the pin within the provider and leaves other providers alone', () => {
+    expect(pinPatches(entries, entries[1]).map(({ name, priority }) => [name, priority])).toEqual([
+      ['a', 0],
+      ['b', PIN_PRIORITY],
+      ['c', 0],
+    ]);
+  });
+
+  test('unpin resets only that provider', () => {
+    expect(unpinPatches(entries, 'claude').map(({ name }) => name)).toEqual(['a', 'c']);
+  });
+});

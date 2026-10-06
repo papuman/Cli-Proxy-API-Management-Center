@@ -41,6 +41,7 @@ import { QUOTA_ADAPTERS, type QuotaCardState } from '../providers';
 import type { QuotaProviderType } from '../providers/types';
 import { useClaudeResetGrants } from '../providers/claude/ClaudeResetGrants';
 import { QUOTA_PROGRESS_HIGH_THRESHOLD, QUOTA_PROGRESS_MEDIUM_THRESHOLD } from './QuotaMeter';
+import { AccountRouting } from './AccountRouting';
 import styles from './QuotaLedger.module.scss';
 
 export type QuotaLedgerProps = {
@@ -340,6 +341,7 @@ function LedgerRow(props: LedgerRowProps) {
         <div className={styles.name} title={name}>
           {name}
         </div>
+        <AccountRouting entry={entry} />
         <IdentityDetails entry={entry} quota={quota} now={now} />
         {file.unavailable && (
           <div className={styles.unavailable}>{t('quota_management.ledger_unavailable')}</div>

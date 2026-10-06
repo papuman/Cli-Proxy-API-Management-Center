@@ -24,6 +24,7 @@ import { QUOTA_ADAPTERS, type QuotaCardState } from '../providers';
 import { isQuotaRefreshDisabled, type QuotaFileEntry } from '../logic';
 import { useClaudeResetGrants } from '../providers/claude/ClaudeResetGrants';
 import bodyStyles from './QuotaBody.module.scss';
+import { AccountRouting } from './AccountRouting';
 import styles from './QuotaCard.module.scss';
 
 /** 额度页全页外衣：QuotaBody 模块绑定成类型化契约（缺键在模块初始化即抛）。 */
@@ -110,6 +111,7 @@ export function QuotaCard(props: QuotaCardProps) {
         <span className={styles.fileName} title={displayName}>
           {displayName}
         </span>
+        <AccountRouting entry={entry} />
       </header>
 
       <div className={styles.body}>

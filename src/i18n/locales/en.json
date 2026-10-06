@@ -1603,7 +1603,18 @@
     "ledger_hide": "Hide",
     "ledger_renews": "renews",
     "ledger_available": "available",
-    "ledger_no_windows": "No quota windows reported"
+    "ledger_no_windows": "No quota windows reported",
+    "routing_in_use": "In use",
+    "routing_in_use_hint": "{{count}} requests in the last 20 minutes",
+    "routing_pinned": "Pinned",
+    "routing_pinned_hint": "New requests go to this account first. Others take over only when it is unavailable or out of quota.",
+    "routing_pin": "Use",
+    "routing_pin_hint": "Use this account: send new requests here first",
+    "routing_unpin": "Unpin",
+    "routing_unpin_hint": "Stop preferring this account; go back to automatic picking",
+    "routing_pin_done": "Now using {{name}}",
+    "routing_unpin_done": "Back to automatic account picking",
+    "routing_failed": "Could not change the account: {{message}}"
   },
   "plugin_management": {
     "title": "Plugin Management",

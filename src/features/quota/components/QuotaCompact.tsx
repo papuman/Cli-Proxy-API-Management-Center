@@ -27,6 +27,7 @@ import type { QuotaFileEntry } from '../logic';
 import { QUOTA_ADAPTERS, type QuotaCardState } from '../providers';
 import { useClaudeResetGrants } from '../providers/claude/ClaudeResetGrants';
 import { QUOTA_PROGRESS_HIGH_THRESHOLD, QUOTA_PROGRESS_MEDIUM_THRESHOLD } from './QuotaMeter';
+import { AccountRouting } from './AccountRouting';
 import styles from './QuotaCompact.module.scss';
 
 export type QuotaCompactProps = {
@@ -192,6 +193,7 @@ function CompactRow(props: {
         />
         <span className={styles.name}>{name}</span>
         {plan && <span className={styles.plan}>{plan.label}</span>}
+        <AccountRouting entry={entry} />
       </div>
 
       {status !== 'success' ? (

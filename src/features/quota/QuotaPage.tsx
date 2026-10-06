@@ -18,7 +18,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
 import { useNow } from '@/hooks/useNow';
 import { useRevealGroup } from '@/hooks/motion';
-import { useAuthStore, useQuotaStore, useThemeStore } from '@/stores';
+import { useAuthStore, useNotificationStore, useQuotaStore, useThemeStore } from '@/stores';
 import type { AuthFileItem, ResolvedTheme } from '@/types';
 import { getQuotaCacheKey } from '@/utils/quota/identity';
 import { ProviderTabs } from '@/features/authFiles/components/ProviderTabs';
@@ -27,6 +27,7 @@ import { QuotaCard } from './components/QuotaCard';
 import { QuotaLedger } from './components/QuotaLedger';
 import { QuotaCompact } from './components/QuotaCompact';
 import { QuotaTimeline } from './components/QuotaTimeline';
+import { RoutingContext, type RoutingContextValue } from './routingContext';
 import {
   CARD_ENTRANCE_BUDGET_MS,
   QUOTA_PAGE_SIZE,
@@ -49,6 +50,7 @@ import {
 } from './logic';
 import { headlineRemaining, ledgerMeters } from './ledger';
 import { nextRecoveryMs } from './resetSchedule';
+import { buildRoutingState, pinPatches, unpinPatches } from './routing';
 import { QUOTA_ADAPTERS, getQuotaSetter, type QuotaCardState } from './providers';
 import type { QuotaProviderType } from './providers/types';
 import { useDevinQuotaAutoLoad } from './providers/devin/useDevinQuotaAutoLoad';
@@ -64,6 +66,8 @@ import styles from './QuotaPage.module.scss';
 
 const TAB_IDS: string[] = ['all', ...QUOTA_TAB_ORDER];
 const SKELETON_CARD_COUNT = 6;
+/** List-only refresh for the "In use" tags; never fetches quota. */
+const ROUTING_POLL_MS = 30_000;
 
 /**
  * Existing providers display filenames; Devin's card and timeline share an
@@ -343,6 +347,62 @@ export function QuotaPage() {
 
   const canUseActions = !disableControls && !loading && filesGeneration === sessionGeneration;
 
+  /* ---------- Routing: which account is in use, pin one ---------- */
+
+  const showNotification = useNotificationStore((state) => state.showNotification);
+  const [routingBusy, setRoutingBusy] = useState(false);
+
+  // Keep the "In use" tags current without the skeleton or any quota calls.
+  useEffect(() => {
+    if (disableControls) return;
+    const timer = window.setInterval(() => {
+      if (document.hidden) return;
+      const requestId = listRequestRef.current;
+      authFilesApi
+        .list()
+        .then((data) => {
+          if (requestId === listRequestRef.current && data?.files) setFiles(data.files);
+        })
+        .catch(() => {});
+    }, ROUTING_POLL_MS);
+    return () => window.clearInterval(timer);
+  }, [disableControls]);
+
+  const applyPriorities = useCallback(
+    async (patches: Array<{ name: string; priority: number }>, done: string) => {
+      setRoutingBusy(true);
+      try {
+        for (const patch of patches) {
+          await authFilesApi.patchFields(patch.name, { priority: patch.priority });
+        }
+        showNotification(done, 'success');
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : t('common.unknown_error');
+        showNotification(t('quota_management.routing_failed', { message }), 'error');
+      } finally {
+        setRoutingBusy(false);
+        void loadFiles();
+      }
+    },
+    [loadFiles, showNotification, t]
+  );
+
+  const routing = useMemo<RoutingContextValue>(
+    () => ({
+      ...buildRoutingState(entries),
+      busy: routingBusy,
+      canEdit: canUseActions,
+      onPin: (entry) =>
+        void applyPriorities(
+          pinPatches(entries, entry),
+          t('quota_management.routing_pin_done', { name: entry.file.email || entry.file.name })
+        ),
+      onUnpin: (type) =>
+        void applyPriorities(unpinPatches(entries, type), t('quota_management.routing_unpin_done')),
+    }),
+    [applyPriorities, canUseActions, entries, routingBusy, t]
+  );
+
   /* ---------- 首屏卡片一次性级联入场 ----------
    * 首批数据渲染后立即翻转 cardsAnimated；已挂载的卡片在挂载时捕获过自己的
    * 延迟（QuotaCard 内 useState 初始化），后续切 tab/翻页/刷新新挂载的卡片
@@ -366,196 +426,198 @@ export function QuotaPage() {
   const isEmpty = !loading && filteredEntries.length === 0;
 
   return (
-    <div className={styles.page} ref={revealRef}>
-      <QuotaHeader
-        totalCount={entries.length}
-        loadedCount={loadedCount}
-        attentionCount={attentionCount}
-        refreshing={loading || batchLoading}
-        disableControls={disableControls}
-        onRefreshAll={handleRefreshAll}
-        actions={
-          <>
-            <QuotaHeaderSearch value={search} onChange={handleSearchChange} />
-            {layout !== 'cards' && (
-              <QuotaHeaderToggle pressed={showEmails} onToggle={() => setShowEmails(!showEmails)}>
-                {t(
-                  showEmails
-                    ? 'quota_management.ledger_hide_emails'
-                    : 'quota_management.ledger_show_emails'
-                )}
-              </QuotaHeaderToggle>
-            )}
-          </>
-        }
-      />
+    <RoutingContext.Provider value={routing}>
+      <div className={styles.page} ref={revealRef}>
+        <QuotaHeader
+          totalCount={entries.length}
+          loadedCount={loadedCount}
+          attentionCount={attentionCount}
+          refreshing={loading || batchLoading}
+          disableControls={disableControls}
+          onRefreshAll={handleRefreshAll}
+          actions={
+            <>
+              <QuotaHeaderSearch value={search} onChange={handleSearchChange} />
+              {layout !== 'cards' && (
+                <QuotaHeaderToggle pressed={showEmails} onToggle={() => setShowEmails(!showEmails)}>
+                  {t(
+                    showEmails
+                      ? 'quota_management.ledger_hide_emails'
+                      : 'quota_management.ledger_show_emails'
+                  )}
+                </QuotaHeaderToggle>
+              )}
+            </>
+          }
+        />
 
-      <section className={styles.workbench}>
-        <div className={styles.tabsRow} data-reveal>
-          <ProviderTabs
-            types={TAB_IDS}
-            counts={tabCounts}
-            active={tab}
-            resolvedTheme={resolvedTheme}
-            onChange={handleTabChange}
-          />
-          <div className={styles.viewControls}>
+        <section className={styles.workbench}>
+          <div className={styles.tabsRow} data-reveal>
+            <ProviderTabs
+              types={TAB_IDS}
+              counts={tabCounts}
+              active={tab}
+              resolvedTheme={resolvedTheme}
+              onChange={handleTabChange}
+            />
+            <div className={styles.viewControls}>
+              <div
+                className={styles.layoutSwitch}
+                role="group"
+                aria-label={t('quota_management.ledger_layout')}
+              >
+                {layoutOptions.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className={styles.layoutOption}
+                    aria-pressed={layout === option.value}
+                    onClick={() => handleLayoutChange(option.value)}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+              <Select
+                value={sortMode}
+                options={sortOptions}
+                onChange={handleSortModeChange}
+                ariaLabel={t('quota_management.sort_label')}
+                size="sm"
+                fullWidth={false}
+                className={styles.sortSelect}
+              />
+            </div>
+          </div>
+
+          {error && (
+            <div className={styles.errorBanner} role="alert">
+              {error}
+            </div>
+          )}
+
+          {loading ? (
             <div
-              className={styles.layoutSwitch}
-              role="group"
-              aria-label={t('quota_management.ledger_layout')}
+              className={layout === 'cards' ? styles.grid : styles.ledgerSkeleton}
+              aria-hidden="true"
             >
-              {layoutOptions.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  className={styles.layoutOption}
-                  aria-pressed={layout === option.value}
-                  onClick={() => handleLayoutChange(option.value)}
-                >
-                  {option.label}
-                </button>
+              {Array.from({ length: SKELETON_CARD_COUNT }, (_, index) =>
+                layout === 'compact' ? (
+                  <Skeleton key={index} height={30} rounded={6} />
+                ) : layout === 'ledger' ? (
+                  <Skeleton key={index} height={56} rounded={10} />
+                ) : (
+                  <Skeleton key={index} height={168} rounded={14} />
+                )
+              )}
+            </div>
+          ) : isEmpty ? (
+            <EmptyState
+              title={
+                search.trim()
+                  ? t('quota_management.search_empty_title')
+                  : tab === 'all'
+                    ? t('quota_management.empty_title')
+                    : t(`${QUOTA_ADAPTERS[tab].i18nPrefix}.empty_title`)
+              }
+              description={
+                search.trim()
+                  ? t('quota_management.search_empty_desc')
+                  : tab === 'all'
+                    ? t('quota_management.empty_desc')
+                    : t(`${QUOTA_ADAPTERS[tab].i18nPrefix}.empty_desc`)
+              }
+              action={
+                search.trim() ? (
+                  <Button variant="secondary" size="sm" onClick={() => handleSearchChange('')}>
+                    {t('quota_management.search_clear')}
+                  </Button>
+                ) : tab === 'all' ? undefined : (
+                  <Button variant="secondary" size="sm" onClick={() => handleTabChange('all')}>
+                    {t('auth_files.filter_all')}
+                  </Button>
+                )
+              }
+            />
+          ) : layout === 'compact' ? (
+            <QuotaCompact
+              entries={pageItems}
+              quotaFor={getQuota}
+              showEmails={showEmails}
+              canRefresh={canUseActions}
+              resettingName={resettingQuotaName}
+              onRefresh={(entry) => void refreshQuota(entry.file, QUOTA_ADAPTERS[entry.type])}
+              onReset={(entry) => resetQuota(entry.file, QUOTA_ADAPTERS[entry.type])}
+            />
+          ) : layout === 'ledger' ? (
+            <QuotaLedger
+              entries={pageItems}
+              summaryEntries={sortedEntries}
+              quotaFor={getQuota}
+              resolvedTheme={resolvedTheme}
+              showEmails={showEmails}
+              canRefresh={canUseActions}
+              resettingName={resettingQuotaName}
+              onRefresh={(entry) => void refreshQuota(entry.file, QUOTA_ADAPTERS[entry.type])}
+              onReset={(entry) => resetQuota(entry.file, QUOTA_ADAPTERS[entry.type])}
+            />
+          ) : (
+            <div className={styles.grid}>
+              {pageItems.map((entry, index) => (
+                <QuotaCard
+                  key={`${entry.type}:${getQuotaCacheKey(entry.file)}`}
+                  entry={entry}
+                  quota={getQuota(entry)}
+                  resolvedTheme={resolvedTheme}
+                  canRefresh={canUseActions && !entry.file.disabled}
+                  resetting={resettingQuotaName === getQuotaCacheKey(entry.file)}
+                  entranceDelayMs={cardEntranceDelay(index)}
+                  onRefresh={() => void refreshQuota(entry.file, QUOTA_ADAPTERS[entry.type])}
+                  onReset={() => resetQuota(entry.file, QUOTA_ADAPTERS[entry.type])}
+                />
               ))}
             </div>
-            <Select
-              value={sortMode}
-              options={sortOptions}
-              onChange={handleSortModeChange}
-              ariaLabel={t('quota_management.sort_label')}
-              size="sm"
-              fullWidth={false}
-              className={styles.sortSelect}
-            />
-          </div>
-        </div>
+          )}
 
-        {error && (
-          <div className={styles.errorBanner} role="alert">
-            {error}
-          </div>
-        )}
-
-        {loading ? (
-          <div
-            className={layout === 'cards' ? styles.grid : styles.ledgerSkeleton}
-            aria-hidden="true"
-          >
-            {Array.from({ length: SKELETON_CARD_COUNT }, (_, index) =>
-              layout === 'compact' ? (
-                <Skeleton key={index} height={30} rounded={6} />
-              ) : layout === 'ledger' ? (
-                <Skeleton key={index} height={56} rounded={10} />
-              ) : (
-                <Skeleton key={index} height={168} rounded={14} />
-              )
-            )}
-          </div>
-        ) : isEmpty ? (
-          <EmptyState
-            title={
-              search.trim()
-                ? t('quota_management.search_empty_title')
-                : tab === 'all'
-                  ? t('quota_management.empty_title')
-                  : t(`${QUOTA_ADAPTERS[tab].i18nPrefix}.empty_title`)
-            }
-            description={
-              search.trim()
-                ? t('quota_management.search_empty_desc')
-                : tab === 'all'
-                  ? t('quota_management.empty_desc')
-                  : t(`${QUOTA_ADAPTERS[tab].i18nPrefix}.empty_desc`)
-            }
-            action={
-              search.trim() ? (
-                <Button variant="secondary" size="sm" onClick={() => handleSearchChange('')}>
-                  {t('quota_management.search_clear')}
-                </Button>
-              ) : tab === 'all' ? undefined : (
-                <Button variant="secondary" size="sm" onClick={() => handleTabChange('all')}>
-                  {t('auth_files.filter_all')}
-                </Button>
-              )
-            }
-          />
-        ) : layout === 'compact' ? (
-          <QuotaCompact
-            entries={pageItems}
-            quotaFor={getQuota}
-            showEmails={showEmails}
-            canRefresh={canUseActions}
-            resettingName={resettingQuotaName}
-            onRefresh={(entry) => void refreshQuota(entry.file, QUOTA_ADAPTERS[entry.type])}
-            onReset={(entry) => resetQuota(entry.file, QUOTA_ADAPTERS[entry.type])}
-          />
-        ) : layout === 'ledger' ? (
-          <QuotaLedger
-            entries={pageItems}
-            summaryEntries={sortedEntries}
-            quotaFor={getQuota}
-            resolvedTheme={resolvedTheme}
-            showEmails={showEmails}
-            canRefresh={canUseActions}
-            resettingName={resettingQuotaName}
-            onRefresh={(entry) => void refreshQuota(entry.file, QUOTA_ADAPTERS[entry.type])}
-            onReset={(entry) => resetQuota(entry.file, QUOTA_ADAPTERS[entry.type])}
-          />
-        ) : (
-          <div className={styles.grid}>
-            {pageItems.map((entry, index) => (
-              <QuotaCard
-                key={`${entry.type}:${getQuotaCacheKey(entry.file)}`}
-                entry={entry}
-                quota={getQuota(entry)}
-                resolvedTheme={resolvedTheme}
-                canRefresh={canUseActions && !entry.file.disabled}
-                resetting={resettingQuotaName === getQuotaCacheKey(entry.file)}
-                entranceDelayMs={cardEntranceDelay(index)}
-                onRefresh={() => void refreshQuota(entry.file, QUOTA_ADAPTERS[entry.type])}
-                onReset={() => resetQuota(entry.file, QUOTA_ADAPTERS[entry.type])}
-              />
-            ))}
-          </div>
-        )}
-
-        {!loading && filteredEntries.length > QUOTA_PAGE_SIZE && (
-          <div className={styles.pagination}>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setPage(Math.max(1, currentPage - 1))}
-              disabled={currentPage <= 1}
-            >
-              {t('auth_files.pagination_prev')}
-            </Button>
-            <div className={styles.pageInfo}>
-              {t('auth_files.pagination_info', {
-                current: currentPage,
-                total: totalPages,
-                count: filteredEntries.length,
-              })}
+          {!loading && filteredEntries.length > QUOTA_PAGE_SIZE && (
+            <div className={styles.pagination}>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setPage(Math.max(1, currentPage - 1))}
+                disabled={currentPage <= 1}
+              >
+                {t('auth_files.pagination_prev')}
+              </Button>
+              <div className={styles.pageInfo}>
+                {t('auth_files.pagination_info', {
+                  current: currentPage,
+                  total: totalPages,
+                  count: filteredEntries.length,
+                })}
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
+                disabled={currentPage >= totalPages}
+              >
+                {t('auth_files.pagination_next')}
+              </Button>
             </div>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
-              disabled={currentPage >= totalPages}
-            >
-              {t('auth_files.pagination_next')}
-            </Button>
-          </div>
-        )}
+          )}
 
-        {/* 时间线只比较当前页凭证，避免大量凭证一次性生成无界泳道。 */}
-        {layout === 'cards' && (
-          <QuotaTimeline
-            entries={pageItems}
-            quotaFor={getQuota}
-            displayNameFor={displayNameFor}
-            resolvedTheme={resolvedTheme}
-          />
-        )}
-      </section>
-    </div>
+          {/* 时间线只比较当前页凭证，避免大量凭证一次性生成无界泳道。 */}
+          {layout === 'cards' && (
+            <QuotaTimeline
+              entries={pageItems}
+              quotaFor={getQuota}
+              displayNameFor={displayNameFor}
+              resolvedTheme={resolvedTheme}
+            />
+          )}
+        </section>
+      </div>
+    </RoutingContext.Provider>
   );
 }

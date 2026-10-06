@@ -22,6 +22,7 @@ import { useAuthStore, useNotificationStore, useQuotaStore, useThemeStore } from
 import type { AuthFileItem, ResolvedTheme } from '@/types';
 import { getQuotaCacheKey } from '@/utils/quota/identity';
 import { ProviderTabs } from '@/features/authFiles/components/ProviderTabs';
+import { getTypeLabel } from '@/features/authFiles/constants';
 import { QuotaHeader, QuotaHeaderSearch, QuotaHeaderToggle } from './components/QuotaHeader';
 import { QuotaCard } from './components/QuotaCard';
 import { QuotaLedger } from './components/QuotaLedger';
@@ -50,7 +51,14 @@ import {
 } from './logic';
 import { headlineRemaining, ledgerMeters } from './ledger';
 import { nextRecoveryMs } from './resetSchedule';
-import { buildRoutingState, pinPatches, unpinPatches } from './routing';
+import {
+  accountAlias,
+  accountFallbackName,
+  buildRoutingState,
+  inUseEntries,
+  pinPatches,
+  unpinPatches,
+} from './routing';
 import { QUOTA_ADAPTERS, getQuotaSetter, type QuotaCardState } from './providers';
 import type { QuotaProviderType } from './providers/types';
 import { useDevinQuotaAutoLoad } from './providers/devin/useDevinQuotaAutoLoad';
@@ -68,6 +76,8 @@ const TAB_IDS: string[] = ['all', ...QUOTA_TAB_ORDER];
 const SKELETON_CARD_COUNT = 6;
 /** List-only refresh for the "In use" tags; never fetches quota. */
 const ROUTING_POLL_MS = 30_000;
+/** Quota re-read for in-use/pinned accounts; Anthropic rate-limits it per account. */
+const IN_USE_QUOTA_POLL_MS = 5 * 60_000;
 
 /**
  * Existing providers display filenames; Devin's card and timeline share an
@@ -275,7 +285,7 @@ export function QuotaPage() {
 
   /* ---------- 加载与操作 ---------- */
 
-  const { batchLoading, loadQuota } = useQuotaBatchLoader();
+  const { batchLoading, loadQuota, refreshQuietly } = useQuotaBatchLoader();
   const { resettingQuotaName, refreshQuota, resetQuota } = useQuotaActions(disableControls);
 
   const pendingRefreshRef = useRef<number | null>(null);
@@ -369,7 +379,7 @@ export function QuotaPage() {
   }, [disableControls]);
 
   const applyPriorities = useCallback(
-    async (patches: Array<{ name: string; priority: number }>, done: string) => {
+    async (patches: Array<{ name: string; priority: number | null }>, done: string) => {
       setRoutingBusy(true);
       try {
         for (const patch of patches) {
@@ -387,20 +397,76 @@ export function QuotaPage() {
     [loadFiles, showNotification, t]
   );
 
+  const renameAccount = useCallback(
+    async (entry: QuotaFileEntry, alias: string) => {
+      try {
+        await authFilesApi.patchFields(entry.file.name, { note: alias });
+        showNotification(t('quota_management.routing_alias_done'), 'success');
+        void loadFiles();
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : t('common.unknown_error');
+        showNotification(t('quota_management.routing_failed', { message }), 'error');
+        throw err;
+      }
+    },
+    [loadFiles, showNotification, t]
+  );
+
+  const routingState = useMemo(() => buildRoutingState(entries), [entries]);
+
+  // Bars of the account doing the work move without a manual refresh.
+  const quotaTargets = useMemo(
+    () =>
+      entries.filter(
+        (entry) =>
+          !entry.file.disabled &&
+          (routingState.inUse.has(entry.file.name) ||
+            routingState.pinned.get(entry.type) === entry.file.name)
+      ),
+    [entries, routingState]
+  );
+  const quotaTargetsRef = useRef<QuotaFileEntry[]>([]);
+  useEffect(() => {
+    quotaTargetsRef.current = quotaTargets;
+  }, [quotaTargets]);
+  useEffect(() => {
+    if (disableControls) return;
+    const timer = window.setInterval(() => {
+      if (!document.hidden) void refreshQuietly(quotaTargetsRef.current);
+    }, IN_USE_QUOTA_POLL_MS);
+    return () => window.clearInterval(timer);
+  }, [disableControls, refreshQuietly]);
+
+  const accountLabel = (entry: QuotaFileEntry) =>
+    accountAlias(entry.file) || accountFallbackName(entry, showEmails);
+  const nowUsing = QUOTA_TAB_ORDER.filter((type) => entries.some((entry) => entry.type === type))
+    .filter((type) => tab === 'all' || tab === type)
+    .map((type) => {
+      const pinnedName = routingState.pinned.get(type);
+      return {
+        type,
+        active: inUseEntries(entries, routingState, type),
+        pinned: entries.find((entry) => entry.file.name === pinnedName),
+      };
+    });
+
   const routing = useMemo<RoutingContextValue>(
     () => ({
-      ...buildRoutingState(entries),
+      ...routingState,
       busy: routingBusy,
       canEdit: canUseActions,
       onPin: (entry) =>
         void applyPriorities(
           pinPatches(entries, entry),
-          t('quota_management.routing_pin_done', { name: entry.file.email || entry.file.name })
+          t('quota_management.routing_pin_done', {
+            name: accountAlias(entry.file) || entry.file.email || entry.file.name,
+          })
         ),
       onUnpin: (type) =>
         void applyPriorities(unpinPatches(entries, type), t('quota_management.routing_unpin_done')),
+      onRename: renameAccount,
     }),
-    [applyPriorities, canUseActions, entries, routingBusy, t]
+    [applyPriorities, canUseActions, entries, renameAccount, routingBusy, routingState, t]
   );
 
   /* ---------- 首屏卡片一次性级联入场 ----------
@@ -489,6 +555,27 @@ export function QuotaPage() {
               />
             </div>
           </div>
+
+          {!loading && nowUsing.length > 0 && (
+            <div className={styles.nowUsing} aria-live="polite">
+              {nowUsing.map(({ type, active, pinned }) => (
+                <span key={type} className={styles.nowUsingItem}>
+                  <span className={styles.nowUsingProvider}>{getTypeLabel(t, type)}</span>
+                  <span className={active.length ? styles.nowUsingLive : styles.nowUsingIdle} />
+                  <span className={styles.nowUsingName}>
+                    {active.length
+                      ? active.map(accountLabel).join(', ')
+                      : t('quota_management.routing_idle')}
+                  </span>
+                  <span className={styles.nowUsingMode}>
+                    {pinned
+                      ? `${t('quota_management.routing_pinned_short')}: ${accountLabel(pinned)}`
+                      : t('quota_management.routing_auto')}
+                  </span>
+                </span>
+              ))}
+            </div>
+          )}
 
           {error && (
             <div className={styles.errorBanner} role="alert">

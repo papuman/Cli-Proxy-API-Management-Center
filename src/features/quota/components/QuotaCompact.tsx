@@ -10,7 +10,7 @@ import { useTranslation } from 'react-i18next';
 import { IconRefreshCw } from '@/components/ui/icons';
 import { useNow } from '@/hooks/useNow';
 import { formatInstantShort, resolveQuotaErrorMessage } from '@/utils/quota';
-import { getQuotaCacheKey, getQuotaDisplayName } from '@/utils/quota/identity';
+import { getQuotaCacheKey } from '@/utils/quota/identity';
 import { getTypeLabel } from '@/features/authFiles/constants';
 import { QUOTA_TAB_ORDER } from '../constants';
 import {
@@ -19,7 +19,6 @@ import {
   ledgerColumns,
   ledgerMeters,
   ledgerPlan,
-  maskCredentialName,
   summarizeLedger,
   type LedgerMeter,
 } from '../ledger';
@@ -27,7 +26,9 @@ import type { QuotaFileEntry } from '../logic';
 import { QUOTA_ADAPTERS, type QuotaCardState } from '../providers';
 import { useClaudeResetGrants } from '../providers/claude/ClaudeResetGrants';
 import { QUOTA_PROGRESS_HIGH_THRESHOLD, QUOTA_PROGRESS_MEDIUM_THRESHOLD } from './QuotaMeter';
-import { AccountRouting } from './AccountRouting';
+import { AccountName, RoutingButton } from './AccountRouting';
+import { useAccountRouting } from './useAccountRouting';
+import { accountFallbackName } from '../routing';
 import styles from './QuotaCompact.module.scss';
 
 export type QuotaCompactProps = {
@@ -130,8 +131,7 @@ function CompactRow(props: {
     props.onRefresh
   );
 
-  const displayName = getQuotaDisplayName(entry.file);
-  const name = showEmails ? displayName : maskCredentialName(displayName, entry.type);
+  const name = accountFallbackName(entry, showEmails);
   const plan = ledgerPlan(entry.type, quota, t);
   const meters = new Map(ledgerMeters(entry.type, quota, t).map((meter) => [meter.id, meter]));
 
@@ -171,14 +171,16 @@ function CompactRow(props: {
           onClick: props.onReset,
         };
 
+  const { rowClass } = useAccountRouting(entry);
+
   const errorMessage =
     status === 'error'
       ? resolveQuotaErrorMessage(t, quota?.errorStatus, quota?.error || t('common.unknown_error'))
       : null;
 
   return (
-    <div className={styles.row} aria-busy={loading || undefined}>
-      <div className={styles.identity} title={plan ? `${name} · ${plan.label}` : name}>
+    <div className={`${styles.row} ${rowClass}`} aria-busy={loading || undefined}>
+      <div className={styles.identity}>
         <span
           className={`${styles.dot} ${
             status === 'error'
@@ -191,9 +193,8 @@ function CompactRow(props: {
           }`}
           title={entry.file.unavailable ? t('quota_management.ledger_unavailable') : undefined}
         />
-        <span className={styles.name}>{name}</span>
+        <AccountName entry={entry} fallback={name} className={styles.name} />
         {plan && <span className={styles.plan}>{plan.label}</span>}
-        <AccountRouting entry={entry} />
       </div>
 
       {status !== 'success' ? (
@@ -229,6 +230,7 @@ function CompactRow(props: {
       </div>
 
       <div className={styles.actions}>
+        <RoutingButton entry={entry} />
         {reset.show && (
           <button
             type="button"

@@ -7,7 +7,8 @@ export type RoutingContextValue = RoutingState & {
   canEdit: boolean;
   onPin: (entry: QuotaFileEntry) => void;
   onUnpin: (type: string) => void;
+  onRename: (entry: QuotaFileEntry, alias: string) => Promise<void>;
 };
 
-/** QuotaPage provides it; AccountRouting reads it in every layout. */
+/** QuotaPage provides it; the routing pieces read it in every layout. */
 export const RoutingContext = createContext<RoutingContextValue | null>(null);

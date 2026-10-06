@@ -20,7 +20,7 @@ import { selectResetGrant } from './selectResetGrant';
  * account, so switching layouts or re-rendering must not re-read; a refresh
  * after the TTL, or after a claim, reads again.
  */
-const READ_TTL_MS = 2 * 60_000;
+const READ_TTL_MS = 15 * 60_000;
 const recentReads = new Map<string, { at: number; status: AnthropicResetGrantStatus }>();
 
 /** Card-owned reads; the session-scoped journal owns spending and ambiguous retries. */

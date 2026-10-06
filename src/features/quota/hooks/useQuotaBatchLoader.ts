@@ -125,5 +125,43 @@ export function useQuotaBatchLoader() {
     [t]
   );
 
-  return { batchLoading, loadQuota };
+  /**
+   * Background refresh for accounts that are being used: no loading state and
+   * no error state, so the bars update in place and a failed read (e.g. the
+   * provider's per-account rate limit) keeps the last good numbers.
+   */
+  const refreshQuietly = useCallback(
+    async (targets: QuotaFileEntry[]) => {
+      if (loadingRef.current) return;
+      const cacheGeneration = captureQuotaCacheGeneration();
+      await Promise.all(
+        targets.map(async ({ type, file }) => {
+          const adapter = QUOTA_ADAPTERS[type];
+          try {
+            const data = await adapter.fetchQuota(file, t);
+            const state = adapter.buildSuccessState(data);
+            let committed = false;
+            getQuotaSetter(adapter)((prev) => {
+              const next = { ...prev };
+              commitIfQuotaCacheCurrent(
+                cacheGeneration,
+                () => {
+                  next[getQuotaCacheKey(file)] = state;
+                  committed = true;
+                },
+                file.name
+              );
+              return committed ? next : prev;
+            });
+            if (committed) void enrichQuotaInBackground(adapter, file, data, state, t);
+          } catch {
+            // Keep the last good numbers; the next tick tries again.
+          }
+        })
+      );
+    },
+    [t]
+  );
+
+  return { batchLoading, loadQuota, refreshQuietly };
 }

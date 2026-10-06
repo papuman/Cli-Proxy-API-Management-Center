@@ -18,7 +18,7 @@ import {
   resolveQuotaErrorMessage,
   type ResetDisplay,
 } from '@/utils/quota';
-import { getQuotaCacheKey, getQuotaDisplayName } from '@/utils/quota/identity';
+import { getQuotaCacheKey } from '@/utils/quota/identity';
 import {
   getAuthFileIcon,
   getThemeSurfaceIconBackground,
@@ -31,7 +31,6 @@ import {
   ledgerColumns,
   ledgerMeters,
   ledgerPlan,
-  maskCredentialName,
   summarizeLedger,
   type LedgerMeter,
   type LedgerSummaryWindow,
@@ -41,7 +40,9 @@ import { QUOTA_ADAPTERS, type QuotaCardState } from '../providers';
 import type { QuotaProviderType } from '../providers/types';
 import { useClaudeResetGrants } from '../providers/claude/ClaudeResetGrants';
 import { QUOTA_PROGRESS_HIGH_THRESHOLD, QUOTA_PROGRESS_MEDIUM_THRESHOLD } from './QuotaMeter';
-import { AccountRouting } from './AccountRouting';
+import { AccountName, RoutingButton } from './AccountRouting';
+import { useAccountRouting } from './useAccountRouting';
+import { accountFallbackName } from '../routing';
 import styles from './QuotaLedger.module.scss';
 
 export type QuotaLedgerProps = {
@@ -318,8 +319,7 @@ function LedgerRow(props: LedgerRowProps) {
     onRefresh
   );
 
-  const displayName = getQuotaDisplayName(file);
-  const name = showEmails ? displayName : maskCredentialName(displayName, entry.type);
+  const name = accountFallbackName(entry, showEmails);
   const meters = new Map(ledgerMeters(entry.type, quota, t).map((meter) => [meter.id, meter]));
   const secondaryIds = new Set(summary.slice(1).map((window) => window.id));
   const codexResets = entry.type === 'codex' ? codexManualResets(quota) : null;
@@ -334,14 +334,14 @@ function LedgerRow(props: LedgerRowProps) {
     status === 'success' && Boolean(adapter.resetQuota) && codexResets !== null;
   const canCodexReset = quota !== undefined && Boolean(adapter.canResetQuota?.(quota));
   const locale = i18n.resolvedLanguage;
+  const { rowClass } = useAccountRouting(entry);
 
   return (
-    <article className={styles.row} aria-busy={loading || undefined}>
+    <article className={`${styles.row} ${rowClass}`} aria-busy={loading || undefined}>
       <div className={styles.identity}>
-        <div className={styles.name} title={name}>
-          {name}
+        <div className={styles.name}>
+          <AccountName entry={entry} fallback={name} />
         </div>
-        <AccountRouting entry={entry} />
         <IdentityDetails entry={entry} quota={quota} now={now} />
         {file.unavailable && (
           <div className={styles.unavailable}>{t('quota_management.ledger_unavailable')}</div>
@@ -427,6 +427,7 @@ function LedgerRow(props: LedgerRowProps) {
       </div>
 
       <div className={styles.actions}>
+        <RoutingButton entry={entry} />
         {showCodexReset && (
           <ActionButton
             label={t('codex_quota.reset_button')}

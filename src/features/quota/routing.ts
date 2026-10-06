@@ -7,10 +7,12 @@
  *
  * Pinned: the proxy routes to the highest `priority` tier first and only
  * falls back to lower tiers when every account in it is unavailable. Pinning
- * puts one account alone in the top tier; unpinning returns all to 0.
+ * puts one account alone in the top tier; unpinning clears the field again.
  */
 
 import type { AuthFileItem } from '@/types';
+import { getQuotaDisplayName } from '@/utils/quota/identity';
+import { maskCredentialName } from './ledger';
 import type { QuotaFileEntry } from './logic';
 
 export const PIN_PRIORITY = 100;
@@ -56,15 +58,32 @@ export function pinPatches(entries: QuotaFileEntry[], target: QuotaFileEntry) {
     .filter((entry) => entry.type === target.type)
     .map((entry) => ({
       name: entry.file.name,
-      priority: entry.file.name === target.file.name ? PIN_PRIORITY : 0,
-      current: entry.file.priority ?? 0,
+      priority: entry.file.name === target.file.name ? PIN_PRIORITY : null,
+      current: entry.file.priority ?? null,
     }))
     .filter((patch) => patch.priority !== patch.current);
 }
 
-/** Field patches that put every account of the provider back at priority 0. */
+/** Field patches that clear the priority of every account of the provider. */
 export function unpinPatches(entries: QuotaFileEntry[], type: string) {
   return entries
-    .filter((entry) => entry.type === type && (entry.file.priority ?? 0) !== 0)
-    .map((entry) => ({ name: entry.file.name, priority: 0, current: entry.file.priority ?? 0 }));
+    .filter((entry) => entry.type === type && entry.file.priority !== undefined)
+    .map((entry) => ({ name: entry.file.name, priority: null, current: entry.file.priority }));
+}
+
+/** The user's alias for an account; stored in the credential's `note`. */
+export const accountAlias = (file: AuthFileItem): string =>
+  typeof file.note === 'string' ? file.note.trim() : '';
+
+/** Busiest in-use account first, so the summary names the main one. */
+export function inUseEntries(entries: QuotaFileEntry[], state: RoutingState, type: string) {
+  return entries
+    .filter((entry) => entry.type === type && state.inUse.has(entry.file.name))
+    .sort((a, b) => (state.inUse.get(b.file.name) ?? 0) - (state.inUse.get(a.file.name) ?? 0));
+}
+
+/** Name shown when there is no alias: the account email, masked unless emails are shown. */
+export function accountFallbackName(entry: QuotaFileEntry, showEmails: boolean): string {
+  const base = entry.file.email?.trim() || getQuotaDisplayName(entry.file);
+  return showEmails ? base : maskCredentialName(base, entry.type);
 }

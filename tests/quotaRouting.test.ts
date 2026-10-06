@@ -53,13 +53,14 @@ describe('pin patches', () => {
 
   test('moves the pin within the provider and leaves other providers alone', () => {
     expect(pinPatches(entries, entries[1]).map(({ name, priority }) => [name, priority])).toEqual([
-      ['a', 0],
+      ['a', null],
       ['b', PIN_PRIORITY],
-      ['c', 0],
+      ['c', null],
     ]);
   });
 
   test('unpin resets only that provider', () => {
     expect(unpinPatches(entries, 'claude').map(({ name }) => name)).toEqual(['a', 'c']);
+    expect(unpinPatches([entry('claude', { name: 'z', priority: 0 })], 'claude')).toHaveLength(1);
   });
 });

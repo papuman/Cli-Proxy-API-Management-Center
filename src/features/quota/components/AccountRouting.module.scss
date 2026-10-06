@@ -1,51 +1,118 @@
 @use '../../../styles/mixins' as *;
 
-.routing {
+/* The account the proxy is sending requests to: tinted row + accent edge.
+ * Nothing is added inside the row, so meter columns stay aligned. */
+.inUseRow {
+  background: color-mix(in srgb, var(--viz-success) 9%, transparent);
+  box-shadow: inset 3px 0 0 var(--viz-success);
+}
+
+.pinnedRow:not(.inUseRow) {
+  box-shadow: inset 3px 0 0 var(--primary-color);
+}
+
+.nameWrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+
+  &:hover .rename,
+  &:focus-within .rename {
+    opacity: 1;
+  }
+}
+
+.name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.alias {
+  font-family: inherit;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.inUseRow .name {
+  font-weight: 700;
+}
+
+.rename {
+  @include button-reset;
   display: inline-flex;
   flex-shrink: 0;
-  align-items: center;
-  gap: 5px;
-}
-
-.tag {
-  padding: 1px 6px;
-  border-radius: 999px;
-  font-size: 10.5px;
-  font-weight: 600;
-  line-height: 1.5;
-  white-space: nowrap;
-}
-
-.inUse {
-  color: var(--viz-success);
-  background: color-mix(in srgb, var(--viz-success) 14%, transparent);
-}
-
-.pinned {
-  color: var(--primary-color);
-  background: color-mix(in srgb, var(--primary-color) 14%, transparent);
-}
-
-.toggle {
-  @include button-reset;
-  font: inherit;
-  font-size: 11px;
-  white-space: nowrap;
-  color: var(--text-tertiary);
+  color: var(--text-quaternary);
   cursor: pointer;
-
-  &:disabled {
-    cursor: not-allowed;
-    opacity: 0.4;
-  }
+  opacity: 0;
 
   &:hover:not(:disabled) {
     color: var(--text-primary);
   }
 
   &:focus-visible {
+    opacity: 1;
     outline: 2px solid var(--primary-color);
     outline-offset: 2px;
     border-radius: 4px;
+  }
+}
+
+.aliasInput {
+  width: 100%;
+  min-width: 0;
+  padding: 2px 6px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  border: 1px solid var(--primary-color);
+  border-radius: 5px;
+  outline: none;
+}
+
+.useButton {
+  @include button-reset;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 62px;
+  height: 22px;
+  padding: 0 10px;
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--text-secondary);
+  border: 1px solid var(--bg-tertiary);
+  border-radius: 999px;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    color: var(--text-primary);
+    border-color: var(--text-tertiary);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.4;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+  }
+}
+
+.useButtonPinned {
+  color: var(--primary-contrast);
+  background: var(--primary-color);
+  border-color: var(--primary-color);
+
+  &:hover:not(:disabled) {
+    color: var(--primary-contrast);
+    background: var(--primary-hover);
+    border-color: var(--primary-hover);
   }
 }

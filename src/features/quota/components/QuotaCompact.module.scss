@@ -20,13 +20,14 @@
 .row {
   display: grid;
   grid-template-columns:
-    minmax(170px, 1.3fr)
-    repeat(var(--meter-count), minmax(150px, 1fr))
-    96px
-    auto;
+    minmax(180px, 1.3fr)
+    repeat(var(--meter-count), minmax(130px, 1fr))
+    112px
+    150px;
   align-items: center;
   gap: 14px;
-  min-width: max-content;
+  /* Fit the page; scroll sideways only on narrow screens. */
+  min-width: calc(560px + var(--meter-count) * 130px);
   height: 30px;
   padding: 0 12px;
   font-size: 12px;

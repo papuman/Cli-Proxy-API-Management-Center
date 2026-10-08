@@ -2245,6 +2245,7 @@
     "auth_error": "授权被拒绝。",
     "state_used": "已用",
     "state_paused": "已暂停",
-    "state_not_usable": "暂不可用"
+    "state_not_usable": "暂不可用",
+    "proxy_cleared": "已清除代理冷却：该账户已重新参与轮换。"
   }
 }

@@ -2271,6 +2271,7 @@
     "auth_error": "授權遭拒。",
     "state_used": "已用",
     "state_paused": "已暫停",
-    "state_not_usable": "暫不可用"
+    "state_not_usable": "暫不可用",
+    "proxy_cleared": "已清除代理冷卻：該帳戶已重新參與輪換。"
   }
 }

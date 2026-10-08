@@ -1,5 +1,6 @@
 // Upstream cedar_ember contract, following opencodex anthropic-reset-grants.
 import { apiCallApi } from './apiCall';
+import { apiClient } from './client';
 import { CLAUDE_REQUEST_HEADERS } from '@/utils/quota/constants';
 
 export const ANTHROPIC_API_ORIGIN = 'https://api.anthropic.com';
@@ -325,4 +326,12 @@ export async function claimClaudeResetGrant(
     /* The proxy may have sent the claim even if the management request failed. */
   }
   throw new AnthropicResetGrantUnknownOutcome();
+}
+
+/**
+ * Clears the proxy's own cooldown for one credential. The proxy marks an account
+ * blocked after a 429 and does not learn about a reset done at Anthropic.
+ */
+export async function clearClaudeProxyCooldown(authIndex: string): Promise<void> {
+  await apiClient.post(apiClient.legacyManagementUrl('/reset-quota'), { auth_index: authIndex });
 }

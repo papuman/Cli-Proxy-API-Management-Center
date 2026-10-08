@@ -146,6 +146,7 @@ function setup() {
   let now = 100;
   let count = 0;
   const ids: string[] = [];
+  const cleared: string[] = [];
   const deps = {
     revision: () => revision,
     now: () => now,
@@ -161,10 +162,14 @@ function setup() {
       ids.push(id);
       throw new AnthropicResetGrantUnknownOutcome();
     },
+    clearCooldown: async (authIndex: string) => {
+      cleared.push(authIndex);
+    },
   };
   return {
     deps,
     ids,
+    cleared,
     nextSession: () => {
       revision++;
     },
@@ -230,6 +235,7 @@ test('a retry refusal keeps the ambiguous original operation open', async () => 
   expect(await operations.run('account', 'a', grant.id)).toEqual({
     code: 'rate_limited',
     unresolved: true,
+    cleared: false,
   });
   expect(operations.inspect('account')?.code).toBeUndefined();
   h.deps.claim = async (_auth, _org, _grant, id) => {
@@ -239,6 +245,7 @@ test('a retry refusal keeps the ambiguous original operation open', async () => 
   expect(await operations.run('account', 'a', grant.id)).toEqual({
     code: 'already_used',
     unresolved: false,
+    cleared: true,
   });
   expect(h.ids).toEqual(['request-1', 'request-1', 'request-1']);
 });
@@ -273,14 +280,53 @@ test('date, pause, limit, balance, usability and cooldown gates refuse new spend
     );
     expect(h.ids).toHaveLength(0);
   }
-  for (const fields of [{ atLimit: false }, { cooldownUntil: '2099-01-01T00:00:00Z' }]) {
-    const h = setup();
-    h.deps.readStatus = async () => ({ ...status(), ...fields });
-    await expect(createResetGrantOperations(h.deps).run('account', 'a', grant.id)).rejects.toThrow(
-      'blocked'
-    );
-    expect(h.ids).toHaveLength(0);
-  }
+  const h = setup();
+  h.deps.readStatus = async () => ({ ...status(), cooldownUntil: '2099-01-01T00:00:00Z' });
+  await expect(createResetGrantOperations(h.deps).run('account', 'a', grant.id)).rejects.toThrow(
+    'blocked:cooldown'
+  );
+  expect(h.ids).toHaveLength(0);
+});
+
+test('not limited at Anthropic spends nothing and clears the proxy cooldown', async () => {
+  const h = setup();
+  h.deps.readStatus = async () => ({ ...status(), atLimit: false });
+  expect(await createResetGrantOperations(h.deps).run('account', 'a', grant.id)).toEqual({
+    code: 'not_limited',
+    unresolved: false,
+    cleared: true,
+  });
+  expect(h.ids).toHaveLength(0);
+  expect(h.cleared).toEqual(['a']);
+});
+
+test('a successful reset clears the proxy cooldown; a failed clear still reports the reset', async () => {
+  const h = setup();
+  h.deps.claim = async () => 'reset';
+  expect(await createResetGrantOperations(h.deps).run('account', 'a', grant.id)).toEqual({
+    code: 'reset',
+    unresolved: false,
+    cleared: true,
+  });
+  expect(h.cleared).toEqual(['a']);
+  h.deps.clearCooldown = async () => {
+    throw new Error('network');
+  };
+  expect(await createResetGrantOperations(h.deps).run('account2', 'b', grant.id)).toEqual({
+    code: 'reset',
+    unresolved: false,
+    cleared: false,
+  });
+});
+
+test('a rate-limited usage read reports rate limiting, not a generic block', async () => {
+  const h = setup();
+  h.deps.readStatus = async () => {
+    throw new AnthropicResetGrantError('rate_limited');
+  };
+  await expect(createResetGrantOperations(h.deps).run('account', 'a', grant.id)).rejects.toThrow(
+    'blocked:rate_limited'
+  );
 });
 
 test('a stale claim answer cannot settle the replacement session operation', async () => {
@@ -314,6 +360,9 @@ test('all grant messages and confirmation are translated in four locales', async
       'unknown',
       'expired',
     ]) {
+      expect(typeof locale[key]).toBe('string');
+    }
+    for (const key of ['proxy_cleared', 'cooldown', 'ineligible']) {
       expect(typeof locale[key]).toBe('string');
     }
   }

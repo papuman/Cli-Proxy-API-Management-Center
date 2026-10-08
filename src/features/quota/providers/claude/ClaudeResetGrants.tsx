@@ -109,17 +109,28 @@ export function useClaudeResetGrants(
         try {
           const answer = await resetGrantOperations.run(key, authIndex, selected);
           if (!current()) return;
+          const text = t(`claude_reset.${answer.unresolved ? 'unknown' : answer.code}`);
           showNotification(
-            t(`claude_reset.${answer.unresolved ? 'unknown' : answer.code}`),
-            !answer.unresolved && (answer.code === 'reset' || answer.code === 'already_used')
+            answer.cleared ? `${text} ${t('claude_reset.proxy_cleared')}` : text,
+            answer.cleared ||
+              (!answer.unresolved && (answer.code === 'reset' || answer.code === 'already_used'))
               ? 'success'
               : 'error'
           );
-        } catch {
+        } catch (error) {
           if (!current()) return;
           const unresolved = resetGrantOperations.inspect(key);
+          const reason = error instanceof Error ? error.message.replace(/^blocked:/, '') : '';
           showNotification(
-            t(`claude_reset.${unresolved && !unresolved.code ? 'unknown' : 'blocked'}`),
+            t(
+              `claude_reset.${
+                unresolved && !unresolved.code
+                  ? 'unknown'
+                  : ['rate_limited', 'cooldown', 'ineligible'].includes(reason)
+                    ? reason
+                    : 'blocked'
+              }`
+            ),
             'error'
           );
         } finally {

@@ -2263,6 +2263,7 @@
     "auth_error": "Authorization was refused.",
     "state_used": "used",
     "state_paused": "paused",
-    "state_not_usable": "not usable yet"
+    "state_not_usable": "not usable yet",
+    "proxy_cleared": "Proxy cooldown cleared: the account is back in rotation."
   }
 }

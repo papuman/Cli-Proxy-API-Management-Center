@@ -51,6 +51,11 @@ class ApiClient {
     }
   }
 
+  /** Absolute URL for a management route that exists only under v0 (reset-quota has no v8 alias). */
+  legacyManagementUrl(path: string): string {
+    return this.apiBase.replace(/\/v8\/management$/, '/v0/management') + path;
+  }
+
   /** Guards read/modify/write operations across connection changes, including ABA switches. */
   getConnectionRevision(): number {
     return this.connectionRevision;

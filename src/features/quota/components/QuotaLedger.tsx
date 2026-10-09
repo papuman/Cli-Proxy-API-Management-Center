@@ -43,6 +43,7 @@ import { QUOTA_PROGRESS_HIGH_THRESHOLD, QUOTA_PROGRESS_MEDIUM_THRESHOLD } from '
 import { AccountName, RoutingButton } from './AccountRouting';
 import { useAccountRouting } from './useAccountRouting';
 import { accountFallbackName } from '../routing';
+import { useResetKeeperNote } from '../resetKeeperContext';
 import styles from './QuotaLedger.module.scss';
 
 export type QuotaLedgerProps = {
@@ -323,6 +324,7 @@ function LedgerRow(props: LedgerRowProps) {
   const meters = new Map(ledgerMeters(entry.type, quota, t).map((meter) => [meter.id, meter]));
   const secondaryIds = new Set(summary.slice(1).map((window) => window.id));
   const codexResets = entry.type === 'codex' ? codexManualResets(quota) : null;
+  const keeperNote = useResetKeeperNote(file);
   // Show the resets once they are known, even at zero, so every account's reset
   // state is visible; the action is then grayed out instead of hidden.
   const showClaudeResets =
@@ -420,6 +422,7 @@ function LedgerRow(props: LedgerRowProps) {
                       : t('claude_reset.state_not_usable'),
             }))}
             message={claudeReset.message && t(`claude_reset.${claudeReset.message}`)}
+            note={keeperNote && `${t('reset_keeper.title')}: ${keeperNote}`}
             now={now}
             locale={locale}
           />
@@ -560,10 +563,12 @@ function ManualResets(props: {
   total: number | null;
   items: ManualResetItem[];
   message?: string;
+  /** Neutral one-line explanation, e.g. the reset keeper's decision. */
+  note?: string;
   now: number;
   locale?: string;
 }) {
-  const { available, total, items, message, now, locale } = props;
+  const { available, total, items, message, note, now, locale } = props;
   const { t } = useTranslation();
   const label = t('codex_quota.reset_credits_label');
   const remaining = available === null || !total ? null : Math.round((available / total) * 100);
@@ -612,6 +617,7 @@ function ManualResets(props: {
           {message}
         </div>
       )}
+      {note && <div className={styles.manualNote}>{note}</div>}
       {spendable.length === 0 ? (
         <div className={styles.reset}>{t('quota_management.ledger_none_left')}</div>
       ) : (

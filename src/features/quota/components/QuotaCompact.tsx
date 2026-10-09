@@ -29,6 +29,7 @@ import { QUOTA_PROGRESS_HIGH_THRESHOLD, QUOTA_PROGRESS_MEDIUM_THRESHOLD } from '
 import { AccountName, RoutingButton } from './AccountRouting';
 import { useAccountRouting } from './useAccountRouting';
 import { accountFallbackName } from '../routing';
+import { shortKeeperNote, useResetKeeperNote } from '../resetKeeperContext';
 import styles from './QuotaCompact.module.scss';
 
 export type QuotaCompactProps = {
@@ -136,6 +137,7 @@ function CompactRow(props: {
   const meters = new Map(ledgerMeters(entry.type, quota, t).map((meter) => [meter.id, meter]));
 
   const codexResets = entry.type === 'codex' ? codexManualResets(quota) : null;
+  const keeperNote = useResetKeeperNote(entry.file);
   const resets =
     entry.type === 'claude'
       ? claudeReset.count === null
@@ -227,6 +229,11 @@ function CompactRow(props: {
             ]
               .filter(Boolean)
               .join(' · ')}
+        {keeperNote && (
+          <span className={styles.keeperTag} title={keeperNote}>
+            {shortKeeperNote(keeperNote)}
+          </span>
+        )}
       </div>
 
       <div className={styles.actions}>

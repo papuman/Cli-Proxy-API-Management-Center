@@ -7,7 +7,7 @@ import { apiClient } from '@/services/api/client';
 import {
   AnthropicResetGrantError,
   nextGrantExpiryMs,
-  readClaudeResetGrants,
+  readClaudeResetGrantsShared,
   type AnthropicResetGrantStatus,
 } from '@/services/api/claudeResetGrants';
 import type { AuthFileItem } from '@/types';
@@ -61,7 +61,7 @@ export function useClaudeResetGrants(
     let cancelled = false;
     const current = () =>
       !cancelled && version === generation.current && session === apiClient.getConnectionRevision();
-    void readClaudeResetGrants(authIndex).then(
+    void readClaudeResetGrantsShared(authIndex).then(
       (result) => {
         recentReads.set(cacheKey, { at: Date.now(), status: result });
         if (current()) {

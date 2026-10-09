@@ -30,9 +30,12 @@ import {
 } from '@/utils/quota';
 import { normalizeAuthIndex } from '@/utils/authIndex';
 import type { QuotaProviderData } from '../types';
+import { keeperUsageFor } from '@/services/api/resetKeeper';
 
 export type ClaudeQuotaData = {
   windows: ClaudeQuotaWindow[];
+  /** When Anthropic answered: the keeper's read time, or now for a direct read. */
+  readAtMs?: number;
   extraUsage?: ClaudeExtraUsage | null;
   planType?: string | null;
 };
@@ -161,6 +164,22 @@ const fetchClaudeQuota = async (file: AuthFileItem, t: TFunction): Promise<Claud
     throw new Error(t('claude_quota.missing_auth_index'));
   }
 
+  // The reset keeper's copy first: it is the only scheduled reader of Anthropic's
+  // per-account rate-limited usage endpoint. Live proxy headers move the 5-hour and
+  // weekly bars in between (liveSignals.ts). Direct read only if the keeper has none.
+  const kept = await keeperUsageFor(authIndex);
+  const keptPayload = kept ? parseClaudeUsagePayload(kept.usage) : null;
+  if (keptPayload) {
+    return {
+      windows: buildClaudeQuotaWindows(keptPayload, t),
+      extraUsage: keptPayload.extra_usage,
+      planType: kept?.profile
+        ? resolveClaudePlanType(parseClaudeProfilePayload(kept.profile))
+        : null,
+      readAtMs: Date.parse(kept!.read_at),
+    };
+  }
+
   const [usageResult, profileResult] = await Promise.allSettled([
     apiCallApi.request({
       authIndex,
@@ -201,7 +220,7 @@ const fetchClaudeQuota = async (file: AuthFileItem, t: TFunction): Promise<Claud
         )
       : null;
 
-  return { windows, extraUsage: payload.extra_usage, planType };
+  return { windows, extraUsage: payload.extra_usage, planType, readAtMs: Date.now() };
 };
 
 export const CLAUDE_CONFIG: QuotaProviderData<ClaudeQuotaState, ClaudeQuotaData> = {
@@ -217,7 +236,7 @@ export const CLAUDE_CONFIG: QuotaProviderData<ClaudeQuotaState, ClaudeQuotaData>
     windows: data.windows,
     extraUsage: data.extraUsage,
     planType: data.planType,
-    fetchedAtMs: Date.now(),
+    fetchedAtMs: data.readAtMs ?? Date.now(),
   }),
   buildErrorState: (message, status) => ({
     status: 'error',

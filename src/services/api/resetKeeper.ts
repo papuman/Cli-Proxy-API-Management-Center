@@ -46,3 +46,37 @@ export const resetKeeperApi = {
   setAuto: async (auto: boolean) =>
     (await axios.put<ResetKeeperStatus>(url('/mode'), { auto }, config())).data,
 };
+
+export interface KeeperUsageEntry {
+  read_at: string;
+  usage: unknown;
+  profile: unknown;
+}
+
+// One request serves every account card of a page load (they load together).
+const USAGE_SHARE_MS = 5_000;
+let shared: { at: number; promise: Promise<Record<string, KeeperUsageEntry>> } | null = null;
+
+/**
+ * The keeper's latest Anthropic usage answer for one account, or null when the keeper
+ * is unreachable or has not read it yet. The keeper is the only scheduled reader of
+ * Anthropic's per-account rate-limited usage endpoint (each account about every
+ * 10 min), so any number of open dashboards adds no load there.
+ */
+export async function keeperUsageFor(authIndex: string): Promise<KeeperUsageEntry | null> {
+  const now = Date.now();
+  if (!shared || now - shared.at > USAGE_SHARE_MS) {
+    const promise = axios
+      .get<{ accounts: Record<string, KeeperUsageEntry> }>(url('/usage'), config())
+      .then((response) => response.data?.accounts ?? {});
+    shared = { at: now, promise };
+    promise.catch(() => {
+      if (shared?.promise === promise) shared = null;
+    });
+  }
+  try {
+    return (await shared.promise)[authIndex] ?? null;
+  } catch {
+    return null;
+  }
+}

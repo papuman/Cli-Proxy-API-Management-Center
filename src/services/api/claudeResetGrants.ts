@@ -1,6 +1,7 @@
 // Upstream cedar_ember contract, following opencodex anthropic-reset-grants.
 import { apiCallApi } from './apiCall';
 import { apiClient } from './client';
+import { keeperUsageFor } from './resetKeeper';
 import { CLAUDE_REQUEST_HEADERS } from '@/utils/quota/constants';
 
 export const ANTHROPIC_API_ORIGIN = 'https://api.anthropic.com';
@@ -273,6 +274,18 @@ export async function readClaudeResetGrants(authIndex: string) {
   const status = parseAnthropicResetGrantStatus(body.cedar_ember);
   if (!status) throw new AnthropicResetGrantError('malformed');
   return status;
+}
+
+/**
+ * For display only: the reset keeper's copy of the same usage answer when it has one,
+ * so cards don't spend Anthropic's per-account read budget. Spending a grant still
+ * reads live through readClaudeResetGrants.
+ */
+export async function readClaudeResetGrantsShared(authIndex: string) {
+  const kept = await keeperUsageFor(authIndex);
+  const block = kept && isRecord(kept.usage) ? kept.usage.cedar_ember : undefined;
+  const status = block === undefined ? null : parseAnthropicResetGrantStatus(block);
+  return status ?? readClaudeResetGrants(authIndex);
 }
 
 export async function readClaudeOrganization(authIndex: string) {

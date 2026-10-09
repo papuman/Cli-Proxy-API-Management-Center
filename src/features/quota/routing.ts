@@ -27,10 +27,11 @@ export type RoutingState = {
 
 const buckets = (file: AuthFileItem) => file.recentRequests ?? file.recent_requests ?? [];
 
+/** Requests the account actually served lately; failures (e.g. the 429 that blocked it) don't count. */
 export function recentRequestCount(file: AuthFileItem): number {
   return buckets(file)
     .slice(-IN_USE_BUCKETS)
-    .reduce((sum, bucket) => sum + bucket.success + bucket.failed, 0);
+    .reduce((sum, bucket) => sum + bucket.success, 0);
 }
 
 export function buildRoutingState(entries: QuotaFileEntry[]): RoutingState {
@@ -39,7 +40,8 @@ export function buildRoutingState(entries: QuotaFileEntry[]): RoutingState {
   const top = new Map<string, { name: string; priority: number; tie: boolean }>();
   for (const { type, file } of entries) {
     if (file.disabled) continue;
-    const count = recentRequestCount(file);
+    // A blocked account (cooldown, quota) is not taking traffic, whatever it did minutes ago.
+    const count = file.unavailable ? 0 : recentRequestCount(file);
     if (count > 0) inUse.set(file.name, count);
     const priority = file.priority ?? 0;
     if (priority <= 0) continue;

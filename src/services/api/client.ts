@@ -51,6 +51,17 @@ class ApiClient {
     }
   }
 
+  /** Auth header for a helper service that accepts the management key (kept off the 401 → logout path). */
+  managementAuthHeader(): Record<string, string> {
+    return this.managementKey ? { Authorization: `Bearer ${this.managementKey}` } : {};
+  }
+
+  /** Absolute URL for a helper service on the same host as the proxy (e.g. reset-keeper on 8318). */
+  sameHostUrl(port: number, path: string): string {
+    const url = new URL(this.apiBase);
+    return `${url.protocol}//${url.hostname}:${port}${path}`;
+  }
+
   /** Absolute URL for a management route that exists only under v0 (reset-quota has no v8 alias). */
   legacyManagementUrl(path: string): string {
     return this.apiBase.replace(/\/v8\/management$/, '/v0/management') + path;

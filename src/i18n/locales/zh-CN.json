@@ -2247,5 +2247,28 @@
     "state_paused": "已暂停",
     "state_not_usable": "暂不可用",
     "proxy_cleared": "已清除代理冷却：该账户已重新参与轮换。"
+  },
+  "reset_keeper": {
+    "title": "重置管家",
+    "auto": "自动重置",
+    "manual": "手动使用",
+    "auto_hint": "仅当现在重置比等待能多用时才使用重置。",
+    "manual_hint": "只显示将做什么，不使用重置。",
+    "summary": "剩余 {{left}} 次重置 · 用完一周约需 {{hours}} 小时{{learning}}",
+    "learning": "（仍在学习）",
+    "show": "详情",
+    "hide": "收起",
+    "account": "账户",
+    "weekly": "每周",
+    "weekly_refill": "每周恢复",
+    "resets": "重置",
+    "decision": "决定",
+    "expires": "{{when}} 到期",
+    "no_spends": "管家尚未使用任何重置。",
+    "now_auto": "已开启自动重置。",
+    "now_manual": "手动模式：管家不会使用重置。",
+    "save_failed": "无法更改重置模式。",
+    "unreachable": "无法连接重置管家（端口 8318）。",
+    "stale": "重置管家无响应，显示上次状态。"
   }
 }

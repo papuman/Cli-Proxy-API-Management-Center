@@ -2265,5 +2265,28 @@
     "state_paused": "paused",
     "state_not_usable": "not usable yet",
     "proxy_cleared": "Proxy cooldown cleared: the account is back in rotation."
+  },
+  "reset_keeper": {
+    "title": "Reset keeper",
+    "auto": "Auto reset",
+    "manual": "Use it manually",
+    "auto_hint": "Spends a reset only when it buys more use now than waiting.",
+    "manual_hint": "Shows what it would do; spends nothing.",
+    "summary": "{{left}} resets left · a week burns in ~{{hours}} h{{learning}}",
+    "learning": " (still learning)",
+    "show": "Details",
+    "hide": "Hide",
+    "account": "Account",
+    "weekly": "Weekly",
+    "weekly_refill": "Weekly refills",
+    "resets": "Resets",
+    "decision": "Decision",
+    "expires": "expires {{when}}",
+    "no_spends": "No resets spent by the keeper yet.",
+    "now_auto": "Auto reset is on.",
+    "now_manual": "Manual mode: the keeper will not spend resets.",
+    "save_failed": "Could not change the reset mode.",
+    "unreachable": "Reset keeper is not reachable (port 8318).",
+    "stale": "Reset keeper stopped answering; showing the last status."
   }
 }

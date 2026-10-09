@@ -28,6 +28,7 @@ import { QuotaCard } from './components/QuotaCard';
 import { QuotaLedger } from './components/QuotaLedger';
 import { QuotaCompact } from './components/QuotaCompact';
 import { QuotaTimeline } from './components/QuotaTimeline';
+import { ResetKeeperPanel } from './components/ResetKeeperPanel';
 import { RoutingContext, type RoutingContextValue } from './routingContext';
 import {
   CARD_ENTRANCE_BUDGET_MS,
@@ -576,6 +577,8 @@ export function QuotaPage() {
               ))}
             </div>
           )}
+
+          {(tab === 'all' || tab === 'claude') && <ResetKeeperPanel />}
 
           {error && (
             <div className={styles.errorBanner} role="alert">

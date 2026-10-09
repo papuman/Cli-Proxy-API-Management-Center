@@ -18,6 +18,16 @@ const entry = (type: string, file: Partial<AuthFileItem> & { name: string }): Qu
   ({ type, file: { recentRequests: idle, ...file } }) as unknown as QuotaFileEntry;
 
 describe('buildRoutingState', () => {
+  test('a stray request or two next to a busy account is not "in use"', () => {
+    const state = buildRoutingState([
+      entry('claude', { name: 'busy', recentRequests: withRecent([582, 106]) }),
+      entry('claude', { name: 'stray', recentRequests: withRecent([4, 0]) }),
+      entry('claude', { name: 'shared', recentRequests: withRecent([100, 20]) }),
+      entry('codex', { name: 'alone', recentRequests: withRecent([0, 3]) }),
+    ]);
+    expect([...state.inUse.keys()].sort()).toEqual(['alone', 'busy', 'shared']);
+  });
+
   test('a blocked account or one with only failed requests is not in use', () => {
     const failedOnly = [...idle.slice(1), { success: 0, failed: 2 }];
     const state = buildRoutingState([

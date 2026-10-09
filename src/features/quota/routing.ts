@@ -17,6 +17,8 @@ import type { QuotaFileEntry } from './logic';
 
 export const PIN_PRIORITY = 100;
 const IN_USE_BUCKETS = 2;
+/** Below this share of the busiest account's traffic, an account is not "in use" (a stray request or two). */
+const IN_USE_MIN_SHARE = 0.1;
 
 export type RoutingState = {
   /** Requests in the last ~20 minutes, by credential name. */
@@ -35,14 +37,18 @@ export function recentRequestCount(file: AuthFileItem): number {
 }
 
 export function buildRoutingState(entries: QuotaFileEntry[]): RoutingState {
-  const inUse = new Map<string, number>();
+  const counts = new Map<string, { type: string; count: number }>();
+  const busiest = new Map<string, number>();
   const pinned = new Map<string, string>();
   const top = new Map<string, { name: string; priority: number; tie: boolean }>();
   for (const { type, file } of entries) {
     if (file.disabled) continue;
     // A blocked account (cooldown, quota) is not taking traffic, whatever it did minutes ago.
     const count = file.unavailable ? 0 : recentRequestCount(file);
-    if (count > 0) inUse.set(file.name, count);
+    if (count > 0) {
+      counts.set(file.name, { type, count });
+      busiest.set(type, Math.max(busiest.get(type) ?? 0, count));
+    }
     const priority = file.priority ?? 0;
     if (priority <= 0) continue;
     const current = top.get(type);
@@ -51,6 +57,9 @@ export function buildRoutingState(entries: QuotaFileEntry[]): RoutingState {
     else if (priority === current.priority) current.tie = true;
   }
   for (const [type, { name, tie }] of top) if (!tie) pinned.set(type, name);
+  const inUse = new Map<string, number>();
+  for (const [name, { type, count }] of counts)
+    if (count >= (busiest.get(type) ?? 0) * IN_USE_MIN_SHARE) inUse.set(name, count);
   return { inUse, pinned };
 }
 

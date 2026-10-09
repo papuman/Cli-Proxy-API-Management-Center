@@ -27,6 +27,13 @@ interface BatchFetchResult {
   errorStatus?: number;
 }
 
+/**
+ * Anthropic limits its usage endpoint per account (429, ~3 min). Such a refusal says
+ * nothing about the account, so the last good numbers stay instead of an error row.
+ */
+export const isRateLimited = (status: number | undefined, message: string | undefined) =>
+  status === 429 || /^429\b/.test(message ?? '');
+
 export function useQuotaBatchLoader() {
   const { t } = useTranslation();
   const [batchLoading, setBatchLoading] = useState(false);
@@ -55,11 +62,15 @@ export function useQuotaBatchLoader() {
             const adapter = QUOTA_ADAPTERS[type];
             const setQuota = getQuotaSetter(adapter);
 
+            // Last good state per account, put back if the new read is only rate-limited.
+            const lastGood = new Map<string, QuotaCardState>();
             commitIfQuotaCacheCurrent(cacheGeneration, () => {
               setQuota((prev) => {
                 const nextState = { ...prev };
                 entries.forEach(({ file }) => {
-                  nextState[getQuotaCacheKey(file)] = adapter.buildLoadingState();
+                  const key = getQuotaCacheKey(file);
+                  if (prev[key]?.status === 'success') lastGood.set(key, prev[key]);
+                  nextState[key] = adapter.buildLoadingState();
                 });
                 return nextState;
               });
@@ -93,8 +104,13 @@ export function useQuotaBatchLoader() {
                 commitIfQuotaCacheCurrent(
                   cacheGeneration,
                   () => {
-                    nextState[result.cacheKey] =
-                      result.status === 'success'
+                    const kept =
+                      result.status === 'error' &&
+                      isRateLimited(result.errorStatus, result.error) &&
+                      lastGood.get(result.cacheKey);
+                    nextState[result.cacheKey] = kept
+                      ? kept
+                      : result.status === 'success'
                         ? adapter.buildSuccessState(result.data)
                         : adapter.buildErrorState(
                             result.error || t('common.unknown_error'),

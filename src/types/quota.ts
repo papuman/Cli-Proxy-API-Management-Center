@@ -176,6 +176,10 @@ export interface ClaudeQuotaWindow {
 export interface ClaudeQuotaState {
   status: 'idle' | 'loading' | 'success' | 'error';
   windows: ClaudeQuotaWindow[];
+  /** When Anthropic's usage endpoint answered (local clock). */
+  fetchedAtMs?: number;
+  /** Server time of the proxy's live rate-limit headers last applied on top. */
+  liveAtMs?: number;
   extraUsage?: ClaudeExtraUsage | null;
   planType?: string | null;
   error?: string;

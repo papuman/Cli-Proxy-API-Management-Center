@@ -65,6 +65,7 @@ import {
 import { QUOTA_ADAPTERS, getQuotaSetter, type QuotaCardState } from './providers';
 import type { QuotaProviderType } from './providers/types';
 import { useDevinQuotaAutoLoad } from './providers/devin/useDevinQuotaAutoLoad';
+import { applyLiveSignals } from './providers/claude/liveSignals';
 import { useQuotaActions } from './hooks/useQuotaActions';
 import { useQuotaBatchLoader } from './hooks/useQuotaBatchLoader';
 import {
@@ -78,7 +79,8 @@ import styles from './QuotaPage.module.scss';
 const TAB_IDS: string[] = ['all', ...QUOTA_TAB_ORDER];
 const SKELETON_CARD_COUNT = 6;
 /** List-only refresh for the "In use" tags; never fetches quota. */
-const ROUTING_POLL_MS = 30_000;
+// Local call to the proxy only; also carries the live rate-limit headers for the Claude bars.
+const ROUTING_POLL_MS = 5_000;
 /** Quota re-read for in-use/pinned accounts; Anthropic rate-limits it per account. */
 const IN_USE_QUOTA_POLL_MS = 5 * 60_000;
 
@@ -193,6 +195,22 @@ export function QuotaPage() {
   const sortNow = sortMode === 'soonest' ? tick : 0;
 
   const entries = useMemo(() => classifyQuotaFiles(files), [files]);
+
+  // Every file-list poll (30 s) carries the proxy's live rate-limit headers; apply
+  // them to the Claude bars whenever they are newer than the last usage read.
+  useEffect(() => {
+    const nowMs = Date.now();
+    useQuotaStore.getState().setClaudeQuota((previous) => {
+      let next: typeof previous | null = null;
+      for (const entry of entries) {
+        if (entry.type !== 'claude') continue;
+        const key = getQuotaCacheKey(entry.file);
+        const updated = applyLiveSignals(previous[key], entry.file, nowMs);
+        if (updated) (next ??= { ...previous })[key] = updated;
+      }
+      return next ?? previous;
+    });
+  }, [entries]);
   const tabCounts = useMemo(() => buildTabCounts(entries), [entries]);
   const filteredEntries = useMemo(
     () => filterEntriesBySearch(filterEntriesByTab(entries, tab), search),

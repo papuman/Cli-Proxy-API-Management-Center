@@ -217,6 +217,7 @@ export const CLAUDE_CONFIG: QuotaProviderData<ClaudeQuotaState, ClaudeQuotaData>
     windows: data.windows,
     extraUsage: data.extraUsage,
     planType: data.planType,
+    fetchedAtMs: Date.now(),
   }),
   buildErrorState: (message, status) => ({
     status: 'error',
